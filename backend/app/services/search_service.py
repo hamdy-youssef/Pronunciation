@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import random
 from difflib import SequenceMatcher
 from typing import Optional
 
@@ -38,6 +39,9 @@ class SearchService:
             "subtitleText": entry.get("subtitleText") or entry.get("sentence") or entry.get("text", ""),
             "videoTitle": entry.get("videoTitle") or entry.get("title") or entry.get("video_title", ""),
             "channel": entry.get("channel") or entry.get("video_channel", ""),
+            "language": entry.get("language", "en"),
+            "accent": entry.get("accent", "us"),
+            "matchType": entry.get("matchType", "smart"),
             "score": float(entry.get("score", 0) or 0),
             "context": entry.get("context", []),
             "subtitleCues": entry.get("subtitleCues", []),
@@ -214,7 +218,10 @@ class SearchService:
                     "subtitleText": hit["_source"].get("subtitleText", hit["_source"].get("text", "")),
                     "videoTitle": hit["_source"].get("title", ""),
                     "channel": hit["_source"].get("channel", ""),
+                    "language": "en",
+                    "accent": "us",
                     "score": hit.get("_score", 0),
+                    "matchType": "smart",
                     "source": "elasticsearch",
                 }
                 for hit in response["hits"]["hits"]
@@ -223,7 +230,7 @@ class SearchService:
             logger.error(f"ElasticSearch query error: {e}")
             return []
 
-    async def _search_live(self, query: str, accent: str, limit: int = 10) -> list:
+    async def _search_live(self, query: str, accent: str, limit: int = 10, mode: str = "smart") -> list:
         videos = await youtube_service.search_videos(query, accent=accent, max_results=max(limit * 2, 10))
         if not videos:
             return []
@@ -259,6 +266,9 @@ class SearchService:
                     "subtitleText": text,
                     "timestamp": float(caption.get("start", 0) or 0),
                     "duration": max(1.0, round(float(next_start or 0) - float(caption.get("start", 0) or 0), 2)),
+                    "language": "en",
+                    "accent": accent if accent not in ("all", "", None) else "mixed",
+                    "matchType": mode,
                 }
                 score = self._score_entry(query, entry)
                 if score <= 0:
@@ -271,9 +281,22 @@ class SearchService:
         candidates.sort(key=lambda item: (-item["score"], item["timestamp"]))
         return candidates[:limit]
 
-    async def search(self, query: str, accent: str = "us", limit: int = 10) -> list:
+    async def search(
+        self,
+        query: str,
+        accent: str = "all",
+        limit: int = 10,
+        page: int = 1,
+        source: str = "all",
+        mode: str = "smart",
+        randomize: bool = False,
+    ) -> dict:
         settings = get_settings()
-        cache_key = f"search:{accent}:{query}:{limit}"
+        page = max(1, int(page or 1))
+        limit = max(1, min(int(limit or 10), 25))
+        normalized_source = (source or "all").lower()
+        normalized_mode = (mode or "smart").lower()
+        cache_key = f"search:{accent}:{normalized_source}:{normalized_mode}:{int(bool(randomize))}:{query}:{page}:{limit}"
         
         if self.redis_client:
             try:
@@ -284,31 +307,77 @@ class SearchService:
             except Exception as e:
                 logger.warning(f"Redis cache error: {e}")
         
-        results = await self._search_elasticsearch(query, limit)
+        fetch_limit = min(max(limit * page * 2, 25), 100)
+        results = []
 
-        local_results = local_search_service.search(query, accent=accent, max_results=limit)
-        results = self._merge_results(results, [self._build_result(result, "local") for result in local_results])
+        if normalized_source in ("all", "local"):
+            if accent in ("all", "us") and normalized_mode == "smart" and not randomize:
+                elastic_results = await self._search_elasticsearch(query, fetch_limit)
+                results = self._merge_results(results, elastic_results)
 
-        if len(results) < limit:
-            live_results = await self._search_live(query, accent=accent, limit=limit)
+            local_results = local_search_service.search(
+                query,
+                accent=accent,
+                max_results=fetch_limit,
+                mode=normalized_mode,
+                randomize=randomize,
+            )
+            results = self._merge_results(results, [self._build_result(result, "local") for result in local_results])
+
+        if normalized_source in ("all", "youtube") and len(results) < fetch_limit:
+            live_results = await self._search_live(query, accent=accent, limit=fetch_limit, mode=normalized_mode)
             results = self._merge_results(results, [self._build_result(result, result.get("source", "youtube")) for result in live_results])
 
-        results = results[:limit]
+        if randomize and results:
+            top_slice = results[: min(len(results), 30)]
+            random.shuffle(top_slice)
+            results = top_slice + results[min(len(results), 30):]
+
+        total = len(results)
+        start = (page - 1) * limit
+        end = start + limit
+        paged_results = results[start:end]
+        payload = {
+            "results": paged_results,
+            "pagination": {
+                "page": page,
+                "pageSize": limit,
+                "total": total,
+                "totalPages": max(1, (total + limit - 1) // limit),
+                "hasNext": end < total,
+                "hasPrev": page > 1,
+            },
+            "filters": {
+                "accent": accent,
+                "source": normalized_source,
+                "mode": normalized_mode,
+                "randomize": bool(randomize),
+            },
+        }
         
-        if self.redis_client and results:
+        if self.redis_client and paged_results:
             try:
                 await self.redis_client.setex(
                     cache_key,
                     settings.search_cache_ttl,
-                    json.dumps(results)
+                    json.dumps(payload)
                 )
             except Exception as e:
                 logger.warning(f"Redis cache set error: {e}")
         
-        return results
+        return payload
 
-    async def search_best(self, query: str, accent: str = "us", limit: int = 10) -> Optional[dict]:
-        results = await self.search(query, accent=accent, limit=limit)
+    async def search_best(
+        self,
+        query: str,
+        accent: str = "all",
+        limit: int = 10,
+        source: str = "all",
+        mode: str = "smart",
+        randomize: bool = False,
+    ) -> Optional[dict]:
+        response = await self.search(query, accent=accent, limit=limit, source=source, mode=mode, randomize=randomize)
+        results = response.get("results", [])
         if not results:
             return None
 
@@ -352,6 +421,8 @@ class SearchService:
                 "subtitleText": item.get("subtitleText", item.get("sentence", "")),
                 "video_title": transcript.get("title", ""),
                 "video_channel": transcript.get("channel", ""),
+                "language": transcript.get("language", "en"),
+                "accent": transcript.get("accent", "us"),
                 "isMatch": abs(float(item.get("timestamp", 0) or 0) - float(timestamp or 0)) < 0.001,
             })
 
@@ -386,12 +457,16 @@ class SearchService:
                 "subtitleText": text,
                 "video_title": "",
                 "video_channel": "",
+                "language": "en",
+                "accent": "mixed",
             })
 
         return {
             "videoId": video_id,
             "title": "",
             "channel": "",
+            "language": "en",
+            "accent": "mixed",
             "captionCount": len(cleaned),
             "subtitleTranscript": " ".join(item["sentence"] for item in cleaned),
             "captions": cleaned,

@@ -340,6 +340,53 @@
     gap: 8px;
   }
 
+  .filter-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .field {
+    display: grid;
+    gap: 8px;
+  }
+
+  .field span {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    font-family: 'Inter', sans-serif;
+  }
+
+  .select,
+  .toggle-btn {
+    width: 100%;
+    min-height: 52px;
+    border-radius: 16px;
+    border: 1px solid rgba(19, 34, 56, 0.12);
+    background: rgba(255, 255, 255, 0.88);
+    color: var(--ink);
+    font-size: 0.95rem;
+    font-family: 'Space Grotesk', sans-serif;
+    padding: 0 14px;
+  }
+
+  .toggle-btn {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-weight: 600;
+  }
+
+  .toggle-btn.active {
+    border-color: rgba(15, 118, 110, 0.35);
+    background: rgba(15, 118, 110, 0.1);
+    color: var(--accent-2);
+  }
+
   .hint-chip {
     padding: 9px 12px;
     border-radius: 999px;
@@ -402,6 +449,13 @@
   }
 
   .player-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .player-options {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -503,6 +557,113 @@
     padding: 24px;
   }
 
+  .results-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 18px;
+    padding: 14px 0 0;
+    border-top: 1px solid var(--line);
+    flex-wrap: wrap;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .results-toolbar strong {
+    display: block;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  .results-toolbar span {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+
+  .result-nav {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .results-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+    max-height: 420px;
+    overflow: auto;
+    padding-right: 2px;
+  }
+
+  .result-item {
+    width: 100%;
+    text-align: left;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.76);
+    border-radius: 18px;
+    padding: 14px 14px 13px;
+    cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  }
+
+  .result-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(19, 34, 56, 0.08);
+  }
+
+  .result-item.active {
+    border-color: rgba(228, 87, 46, 0.35);
+    box-shadow: 0 0 0 4px rgba(228, 87, 46, 0.08);
+    background: rgba(255, 250, 245, 0.98);
+  }
+
+  .result-item-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .result-item-title {
+    font-weight: 700;
+    line-height: 1.35;
+    font-size: 0.98rem;
+  }
+
+  .result-item-meta {
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 0.84rem;
+    line-height: 1.45;
+  }
+
+  .result-item-snippet {
+    margin-top: 10px;
+    color: var(--ink);
+    line-height: 1.55;
+    font-size: 0.93rem;
+  }
+
+  .result-pill {
+    flex-shrink: 0;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(19, 34, 56, 0.06);
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .results-empty {
+    padding: 16px 0 4px;
+    color: var(--muted);
+    font-family: 'Inter', sans-serif;
+    line-height: 1.6;
+  }
+
   .section-label {
     font-size: 0.82rem;
     text-transform: uppercase;
@@ -572,6 +733,26 @@
     cursor: pointer;
   }
 
+  .ghost-btn.active {
+    border-color: rgba(15, 118, 110, 0.3);
+    background: rgba(15, 118, 110, 0.08);
+    color: var(--accent-2);
+  }
+
+  .pagination-bar {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    flex-wrap: wrap;
+    font-family: 'Inter', sans-serif;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
   .footer {
     margin-top: 24px;
     padding: 10px 4px 0;
@@ -594,6 +775,8 @@
 
     .mini-grid { grid-template-columns: 1fr; }
 
+    .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
     .search-row { flex-direction: column; }
 
     .search-btn { width: 100%; }
@@ -607,6 +790,9 @@
     .player-bar { padding: 14px; }
     .subtitle-stage { padding: 20px 16px 22px; }
     .result-stats { grid-template-columns: 1fr; }
+
+    .filter-grid { grid-template-columns: 1fr; }
+    .results-list { max-height: none; }
   }
 </style>
 </head>
@@ -654,6 +840,37 @@
             </button>
           </div>
 
+          <div class="filter-grid">
+            <label class="field">
+              <span>Accent</span>
+              <select id="accentSelect" class="select">
+                <option value="all">All accents</option>
+                <option value="us">US</option>
+                <option value="uk">UK</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Match mode</span>
+              <select id="modeSelect" class="select">
+                <option value="smart">Smart</option>
+                <option value="phrase">Phrase</option>
+                <option value="exact">Exact</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Source</span>
+              <select id="sourceSelect" class="select">
+                <option value="all">Hybrid</option>
+                <option value="local">Indexed only</option>
+                <option value="youtube">YouTube only</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Result order</span>
+              <button id="randomizeBtn" class="toggle-btn" type="button" onclick="toggleRandomize()">Best matches</button>
+            </label>
+          </div>
+
           <div class="translation-shell">
             <div class="translation-top">
               <strong>Live translation</strong>
@@ -664,9 +881,10 @@
 
           <div class="hint-row">
             <span class="hint-chip">Debounced input</span>
-            <span class="hint-chip">One best match</span>
+            <span class="hint-chip">Accent filters</span>
+            <span class="hint-chip">Paged results</span>
             <span class="hint-chip">Word highlighting</span>
-            <span class="hint-chip">No video list</span>
+            <span class="hint-chip">YouGlish-style flow</span>
           </div>
         </div>
       </div>
@@ -701,6 +919,15 @@
             <button class="icon-btn nav-btn" type="button" onclick="skipTime(-5)" title="Back 5 seconds">-5</button>
             <button class="icon-btn nav-btn" type="button" onclick="skipTime(5)" title="Forward 5 seconds">+5</button>
           </div>
+          <div class="player-options">
+            <select id="speedSelect" class="select" style="width:auto; min-width:96px;" onchange="setPlaybackRate(this.value)">
+              <option value="0.75">0.75x</option>
+              <option value="1" selected>1x</option>
+              <option value="1.25">1.25x</option>
+              <option value="1.5">1.5x</option>
+            </select>
+            <button class="ghost-btn active" id="captionsToggle" type="button" onclick="toggleCaptions()">Captions on</button>
+          </div>
           <div class="player-copy">
             <div class="clip-title" id="clipTitle">Waiting for a match...</div>
             <div class="clip-meta" id="clipMeta">Search a phrase to jump to the exact spoken moment.</div>
@@ -713,10 +940,10 @@
       </div>
 
       <aside class="panel result-card">
-        <div class="section-label">Best match</div>
+        <div class="section-label">Results</div>
         <div id="resultEmpty">
-          <div class="result-title">Your strongest clip will appear here.</div>
-          <div class="result-text">Search any word or phrase to load one exact result with timing, source, and a live subtitle view.</div>
+          <div class="result-title">Your clips will appear here.</div>
+          <div class="result-text">Search any word or phrase to browse multiple spoken moments and jump between them like YouGlish.</div>
         </div>
 
         <div id="resultSummary" style="display:none;">
@@ -726,6 +953,27 @@
           <div class="result-stats">
             <div class="stat"><span class="label">Timestamp</span><span class="value" id="resultTimestamp">0:00</span></div>
             <div class="stat"><span class="label">Score</span><span class="value" id="resultScore">0</span></div>
+          </div>
+        </div>
+
+        <div class="results-toolbar" id="resultsToolbar" style="display:none;">
+          <div>
+            <strong id="resultsCount">0 results</strong>
+            <span id="resultsHint">Pick a result to play it instantly.</span>
+          </div>
+          <div class="result-nav">
+            <button class="ghost-btn" type="button" onclick="prevResult()">Prev result</button>
+            <button class="ghost-btn" type="button" onclick="nextResult()">Next result</button>
+          </div>
+        </div>
+
+        <div class="results-list" id="resultsList"></div>
+
+        <div class="pagination-bar" id="paginationBar">
+          <div id="paginationText">Page 1</div>
+          <div class="result-nav">
+            <button class="ghost-btn" id="pagePrevBtn" type="button" onclick="changePage(-1)">Prev page</button>
+            <button class="ghost-btn" id="pageNextBtn" type="button" onclick="changePage(1)">Next page</button>
           </div>
         </div>
       </aside>
@@ -746,11 +994,18 @@
       query: '',
       queryTokens: [],
       result: null,
+      results: [],
+      selectedResultIndex: 0,
+      transcriptCache: {},
+      pagination: { page: 1, pageSize: 10, total: 0, totalPages: 1, hasNext: false, hasPrev: false },
+      searchOptions: { accent: 'all', mode: 'smart', source: 'all', randomize: false },
       cues: [],
       currentCueIndex: 0,
       player: null,
       playerReady: false,
       isPlaying: false,
+      subtitlesVisible: true,
+      playbackRate: 1,
       loading: false,
       translateTimer: null,
       translateSeq: 0,
@@ -805,6 +1060,185 @@
       return `${mins}:${String(secs).padStart(2, '0')}`;
     }
 
+    function readSearchOptions() {
+      return {
+        accent: document.getElementById('accentSelect').value,
+        mode: document.getElementById('modeSelect').value,
+        source: document.getElementById('sourceSelect').value,
+        randomize: state.searchOptions.randomize,
+      };
+    }
+
+    function buildSearchParams(page = 1) {
+      const params = new URLSearchParams({
+        q: state.query,
+        accent: state.searchOptions.accent,
+        mode: state.searchOptions.mode,
+        source: state.searchOptions.source,
+        randomize: String(state.searchOptions.randomize),
+        page: String(page),
+        limit: String(state.pagination.pageSize || 10),
+      });
+      return params.toString();
+    }
+
+    function toggleRandomize() {
+      state.searchOptions.randomize = !state.searchOptions.randomize;
+      const button = document.getElementById('randomizeBtn');
+      button.classList.toggle('active', state.searchOptions.randomize);
+      button.textContent = state.searchOptions.randomize ? 'Randomized' : 'Best matches';
+    }
+
+    function highlightQueryText(text) {
+      const tokens = Array.from(new Set((state.queryTokens || []).filter(Boolean)));
+      if (!tokens.length) return escapeHtml(text || '');
+
+      let markup = escapeHtml(text || '');
+      tokens.forEach((token) => {
+        const pattern = new RegExp(`(${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig');
+        markup = markup.replace(pattern, '<span class="search-hit">$1</span>');
+      });
+      return markup;
+    }
+
+    function transcriptToCues(transcript, fallback = {}) {
+      if (!transcript || !Array.isArray(transcript.captions)) return [];
+
+      return transcript.captions.map((cue) => ({
+        videoId: transcript.videoId || fallback.videoId || '',
+        timestamp: Number(cue.timestamp ?? cue.start ?? 0),
+        duration: Number(cue.duration ?? fallback.duration ?? 3.5),
+        sentence: cue.sentence || cue.text || '',
+        subtitleText: cue.subtitleText || cue.sentence || cue.text || '',
+        video_title: transcript.title || fallback.videoTitle || '',
+        video_channel: transcript.channel || fallback.channel || '',
+      }));
+    }
+
+    async function fetchTranscript(videoId) {
+      if (!videoId) return null;
+      if (state.transcriptCache[videoId]) return state.transcriptCache[videoId];
+
+      try {
+        const response = await fetch(`${API_BASE}/transcripts/${encodeURIComponent(videoId)}`);
+        if (!response.ok) return null;
+        const data = await response.json();
+        state.transcriptCache[videoId] = data;
+        return data;
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function renderResultsList() {
+      const list = document.getElementById('resultsList');
+      const toolbar = document.getElementById('resultsToolbar');
+      const count = document.getElementById('resultsCount');
+      const hint = document.getElementById('resultsHint');
+
+      if (!state.results.length) {
+        list.innerHTML = '<div class="results-empty">No clips loaded yet.</div>';
+        toolbar.style.display = 'none';
+        renderPagination();
+        return;
+      }
+
+      toolbar.style.display = 'flex';
+      count.textContent = `${state.pagination.total || state.results.length} result${(state.pagination.total || state.results.length) === 1 ? '' : 's'}`;
+      hint.textContent = `Page ${state.pagination.page || 1} of ${state.pagination.totalPages || 1} · ${state.searchOptions.mode} match · ${state.searchOptions.source} source.`;
+
+      list.innerHTML = state.results.map((item, index) => {
+        const active = index === state.selectedResultIndex ? 'active' : '';
+        const source = item.source ? item.source.toUpperCase() : 'CLIP';
+        return `
+          <button class="result-item ${active}" type="button" onclick="loadResult(${index}, true)">
+            <div class="result-item-top">
+              <div>
+                <div class="result-item-title">${escapeHtml(item.videoTitle || 'Untitled video')}</div>
+                <div class="result-item-meta">${escapeHtml(item.channel || 'Unknown channel')} · ${formatTime(item.timestamp || 0)}</div>
+              </div>
+              <div class="result-pill">${escapeHtml(source)}</div>
+            </div>
+            <div class="result-item-snippet">${highlightQueryText(item.sentence || item.subtitleText || '')}</div>
+          </button>
+        `;
+      }).join('');
+
+      renderPagination();
+    }
+
+    function renderPagination() {
+      const bar = document.getElementById('paginationBar');
+      const text = document.getElementById('paginationText');
+      const prev = document.getElementById('pagePrevBtn');
+      const next = document.getElementById('pageNextBtn');
+      const totalPages = state.pagination.totalPages || 1;
+      const total = state.pagination.total || state.results.length || 0;
+
+      if (!total || totalPages <= 1) {
+        bar.style.display = 'none';
+        return;
+      }
+
+      bar.style.display = 'flex';
+      text.textContent = `Page ${state.pagination.page} of ${totalPages} · ${total} total clips`;
+      prev.disabled = !state.pagination.hasPrev;
+      next.disabled = !state.pagination.hasNext;
+    }
+
+    async function loadResult(index, autoplay = true) {
+      const selected = state.results[index];
+      if (!selected) return;
+
+      state.selectedResultIndex = index;
+      state.result = { ...selected };
+      document.getElementById('workspace').classList.add('active');
+
+      const transcript = await fetchTranscript(selected.videoId);
+      if (transcript) {
+        state.result = {
+          ...selected,
+          videoTitle: selected.videoTitle || transcript.title || '',
+          channel: selected.channel || transcript.channel || '',
+        };
+        const cues = transcriptToCues(transcript, state.result);
+        state.cues = cues.length ? cues : (selected.context && selected.context.length ? selected.context : [state.result]);
+        state.currentCueIndex = findCueIndex(selected.timestamp);
+      } else {
+        state.cues = selected.context && selected.context.length ? selected.context : [state.result];
+        state.currentCueIndex = findCueIndex(selected.timestamp);
+      }
+
+      renderResult(state.result);
+      renderResultsList();
+
+      if (autoplay) {
+        playResult(state.result);
+      }
+    }
+
+    function prevResult() {
+      if (!state.results.length) return;
+      const nextIndex = (state.selectedResultIndex - 1 + state.results.length) % state.results.length;
+      loadResult(nextIndex, true);
+    }
+
+    function nextResult() {
+      if (!state.results.length) return;
+      const nextIndex = (state.selectedResultIndex + 1) % state.results.length;
+      loadResult(nextIndex, true);
+    }
+
+    async function changePage(delta) {
+      if (state.loading) return;
+      const nextPage = Math.max(1, (state.pagination.page || 1) + delta);
+      if (nextPage === state.pagination.page) return;
+      if (delta < 0 && !state.pagination.hasPrev) return;
+      if (delta > 0 && !state.pagination.hasNext) return;
+
+      await fetchSearchPage(nextPage);
+    }
+
     function escapeHtml(text) {
       const div = document.createElement('div');
       div.textContent = text;
@@ -836,6 +1270,7 @@
         events: {
           onReady: () => {
             state.playerReady = true;
+            setPlaybackRate(state.playbackRate);
             startTicker();
             if (state.pendingPlay && state.result) {
               playResult(state.result);
@@ -910,6 +1345,11 @@
     }
 
     function renderSubtitle(sentence, elapsedSeconds, cueDuration, queryTokens) {
+      if (!state.subtitlesVisible) {
+        document.getElementById('subtitleDisplay').textContent = 'Captions are hidden for focused listening.';
+        return;
+      }
+
       const words = getSubtitleWords(sentence);
       if (!words.length) {
         document.getElementById('subtitleDisplay').textContent = sentence || 'No subtitle available.';
@@ -951,7 +1391,7 @@
         if (play) state.player.playVideo();
       }
       renderSubtitle(cue.sentence || cue.text || '', 0, cue.duration || 3.5, state.queryTokens);
-      document.getElementById('clipMeta').textContent = `${cue.video_channel || state.result.channel || 'Unknown channel'} · ${formatTime(cue.timestamp || 0)}`;
+      document.getElementById('clipMeta').textContent = `${cue.video_channel || state.result.channel || 'Unknown channel'} · ${(state.result?.accent || 'mixed').toUpperCase()} accent · ${formatTime(cue.timestamp || 0)}`;
     }
 
     function findCueIndex(timestamp) {
@@ -1019,6 +1459,40 @@
       state.translateTimer = setTimeout(() => translateLive(value), 260);
     }
 
+    async function fetchSearchPage(page = 1) {
+      setLoading(true);
+
+      try {
+        const response = await fetch(`${API_BASE}/search?${buildSearchParams(page)}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          showAlert('errorAlert', data.error || 'No match found.');
+          return false;
+        }
+
+        state.results = Array.isArray(data.results) && data.results.length
+          ? data.results
+          : (data.videoId ? [data] : []);
+        state.pagination = data.pagination || state.pagination;
+
+        if (!state.results.length) {
+          showAlert('errorAlert', data.error || 'No match found.');
+          return false;
+        }
+
+        await loadResult(0, true);
+        renderResultsList();
+        document.getElementById('workspace').classList.add('active');
+        return true;
+      } catch (err) {
+        showAlert('errorAlert', 'Search failed. Check the backend and try again.');
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    }
+
     async function startSearch() {
       if (state.loading) return;
       const input = document.getElementById('searchInput');
@@ -1045,41 +1519,11 @@
 
       state.query = query;
       state.queryTokens = normalizeText(query).split(' ').filter(Boolean);
-      setLoading(true);
-
-      try {
-        const response = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          showAlert('errorAlert', data.error || 'No match found.');
-          setLoading(false);
-          return;
-        }
-
-        const result = data.results && Array.isArray(data.results)
-          ? data.results[0]
-          : data;
-
-        if (!result) {
-          showAlert('errorAlert', data.error || 'No match found.');
-          setLoading(false);
-          return;
-        }
-
-        state.result = result;
-        state.cues = Array.isArray(result.subtitleCues) && result.subtitleCues.length
-          ? result.subtitleCues
-          : (Array.isArray(result.context) && result.context.length ? result.context : [result]);
-        state.currentCueIndex = findCueIndex(result.timestamp);
-        renderResult(result);
-        document.getElementById('workspace').classList.add('active');
-        showAlert('successAlert', `Found one strong match for "${query}".`);
-        playResult(result);
-      } catch (err) {
-        showAlert('errorAlert', 'Search failed. Check the backend and try again.');
-      } finally {
-        setLoading(false);
+      state.searchOptions = readSearchOptions();
+      state.pagination.page = 1;
+      const ok = await fetchSearchPage(1);
+      if (ok) {
+        showAlert('successAlert', `Found ${state.pagination.total || state.results.length} clip${(state.pagination.total || state.results.length) === 1 ? '' : 's'} for "${query}".`);
       }
     }
 
@@ -1087,13 +1531,14 @@
       document.getElementById('resultEmpty').style.display = 'none';
       document.getElementById('resultSummary').style.display = 'block';
       document.getElementById('clipTitle').textContent = data.videoTitle || 'Selected clip';
-      document.getElementById('clipMeta').textContent = `${data.channel || 'Unknown channel'} · Starts at ${formatTime(data.timestamp || 0)}`;
+      document.getElementById('clipMeta').textContent = `${data.channel || 'Unknown channel'} · ${(data.accent || 'mixed').toUpperCase()} accent · ${data.source || 'local'} · Clip ${state.selectedResultIndex + 1} of ${Math.max(1, state.results.length)}`;
       document.getElementById('resultSentence').textContent = data.sentence || '';
-      document.getElementById('resultSource').textContent = `${data.videoTitle || 'Unknown video'} · ${data.channel || 'Unknown channel'}`;
+      document.getElementById('resultSource').textContent = `${data.videoTitle || 'Unknown video'} · ${data.channel || 'Unknown channel'} · ${(data.matchType || 'smart')} match · Starts at ${formatTime(data.timestamp || 0)}`;
       document.getElementById('resultTimestamp').textContent = formatTime(data.timestamp || 0);
       document.getElementById('resultScore').textContent = Math.round(Number(data.score || 0));
       renderSubtitle(data.subtitleText || data.sentence || '', 0, data.duration || 3.5, state.queryTokens);
       document.getElementById('currentTime').textContent = formatTime(data.timestamp || 0);
+      document.getElementById('resultsCount').textContent = `${state.pagination.total || state.results.length} result${(state.pagination.total || state.results.length) === 1 ? '' : 's'}`;
     }
 
     function playResult(data) {
@@ -1117,6 +1562,7 @@
             state.player.seekTo(startSeconds, true);
           }
           if (state.player && typeof state.player.playVideo === 'function') {
+            setPlaybackRate(state.playbackRate);
             state.player.playVideo();
           }
         }, 120);
@@ -1128,6 +1574,7 @@
             if (state.player && typeof state.player.seekTo === 'function') {
               state.player.seekTo(startSeconds, true);
             }
+            setPlaybackRate(state.playbackRate);
             state.player.playVideo();
           }, 150);
         } catch (innerErr) {}
@@ -1153,6 +1600,25 @@
     function replayClip() {
       if (!state.result) return;
       playResult(state.result);
+    }
+
+    function setPlaybackRate(value) {
+      const rate = Number(value || 1);
+      state.playbackRate = rate;
+      if (state.player && typeof state.player.setPlaybackRate === 'function') {
+        try {
+          state.player.setPlaybackRate(rate);
+        } catch (err) {}
+      }
+    }
+
+    function toggleCaptions() {
+      state.subtitlesVisible = !state.subtitlesVisible;
+      const button = document.getElementById('captionsToggle');
+      button.classList.toggle('active', state.subtitlesVisible);
+      button.textContent = state.subtitlesVisible ? 'Captions on' : 'Captions off';
+      const cue = state.cues[state.currentCueIndex] || state.result;
+      renderSubtitle(cue?.sentence || cue?.text || '', 0, cue?.duration || state.result?.duration || 3.5, state.queryTokens);
     }
 
     document.getElementById('searchInput').addEventListener('input', (event) => {

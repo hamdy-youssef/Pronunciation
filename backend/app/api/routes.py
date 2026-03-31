@@ -20,7 +20,15 @@ class TranslateRequest(BaseModel):
 
 
 @router.get('/search')
-async def search(q: str, accent: str = 'us', limit: int = 10):
+async def search(
+    q: str,
+    accent: str = 'all',
+    limit: int = 10,
+    page: int = 1,
+    source: str = 'all',
+    mode: str = 'smart',
+    randomize: bool = False,
+):
     query = (q or '').strip()
 
     if len(query) < 2:
@@ -30,16 +38,35 @@ async def search(q: str, accent: str = 'us', limit: int = 10):
         return JSONResponse(status_code=400, content={'error': 'Only letters, spaces, apostrophes, and hyphens are allowed'})
 
     try:
-        result = await search_service.search_best(query, accent=accent, limit=limit)
+        result = await search_service.search_best(
+            query,
+            accent=accent,
+            limit=limit,
+            source=source,
+            mode=mode,
+            randomize=randomize,
+        )
 
         if not result:
             return JSONResponse(status_code=404, content={'error': 'No match found'})
 
-        results = await search_service.search(query, accent=accent, limit=limit)
+        response = await search_service.search(
+            query,
+            accent=accent,
+            limit=limit,
+            page=page,
+            source=source,
+            mode=mode,
+            randomize=randomize,
+        )
+        results = response.get('results', [])
 
         return {
             'query': query,
             'accent': accent,
+            'mode': mode,
+            'requestedSource': source,
+            'randomize': randomize,
             'results': results,
             'videoId': result['videoId'],
             'timestamp': result['timestamp'],
@@ -53,7 +80,9 @@ async def search(q: str, accent: str = 'us', limit: int = 10):
             'subtitleCues': result.get('subtitleCues', []),
             'subtitleTranscript': result.get('subtitleTranscript', ''),
             'source': result.get('source', ''),
-            'totalResults': len(results),
+            'totalResults': response.get('pagination', {}).get('total', len(results)),
+            'pagination': response.get('pagination', {}),
+            'filters': response.get('filters', {}),
         }
     except Exception as e:
         logger.error('Search error: %s', e)

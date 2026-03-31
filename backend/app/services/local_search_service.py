@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import random
 import re
 from difflib import SequenceMatcher
 from typing import Optional
@@ -33,6 +34,7 @@ class LocalSearchService:
         entries = []
 
         for video in transcripts:
+            accent = self._infer_accent(video)
             captions = sorted(video.get('captions', []), key=lambda item: item.get('start', 0))
 
             for index, cap in enumerate(captions):
@@ -48,6 +50,8 @@ class LocalSearchService:
                     'videoId': video.get('videoId'),
                     'videoTitle': video.get('title', ''),
                     'channel': video.get('channel', ''),
+                    'language': video.get('language', 'en'),
+                    'accent': accent,
                     'text': text,
                     'subtitle_text': text,
                     'clean_text': self._normalize(text),
@@ -59,13 +63,29 @@ class LocalSearchService:
         return entries
 
     @staticmethod
+    def _infer_accent(video: dict) -> str:
+        haystack = ' '.join([
+            str(video.get('title', '')),
+            str(video.get('channel', '')),
+            str(video.get('accent', '')),
+        ]).lower()
+
+        if any(token in haystack for token in ('bbc', 'queen', 'adele', 'warren buffett', 'business insider')):
+            return 'uk'
+        if any(token in haystack for token in ('luis fonsi', 'despacito')):
+            return 'es'
+        if any(token in haystack for token in ('stanford', 'tesla', 'obama', 'ted', 'ellen', 'jawed')):
+            return 'us'
+        return video.get('accent', 'us')
+
+    @staticmethod
     def _normalize(text: str) -> str:
         text = text.lower()
         text = re.sub(r"[^\w\s]", ' ', text)
         text = re.sub(r'\s+', ' ', text)
         return text.strip()
 
-    def _score(self, query: str, entry: dict) -> float:
+    def _score(self, query: str, entry: dict, mode: str = 'smart') -> float:
         normalized_query = self._normalize(query)
         normalized_text = entry.get('clean_text', '')
 
@@ -74,6 +94,14 @@ class LocalSearchService:
 
         if normalized_query == normalized_text:
             return 100.0
+
+        if mode == 'exact':
+            return 92.0 if re.search(rf'\b{re.escape(normalized_query)}\b', normalized_text) else 0.0
+
+        if mode == 'phrase':
+            if normalized_query in normalized_text:
+                return 88.0 + (5.0 if normalized_text.startswith(normalized_query) else 0.0)
+            return 0.0
 
         score = 0.0
 
@@ -99,13 +127,16 @@ class LocalSearchService:
 
         return round(score, 3)
 
-    def search(self, query: str, accent: str = 'us', max_results: int = 50) -> list:
+    def search(self, query: str, accent: str = 'all', max_results: int = 50, mode: str = 'smart', randomize: bool = False) -> list:
         if not query:
             return []
 
         ranked = []
         for entry in self.entries:
-            score = self._score(query, entry)
+            if accent not in ('all', '', None) and entry.get('accent') != accent:
+                continue
+
+            score = self._score(query, entry, mode=mode)
             if score <= 0:
                 continue
 
@@ -117,14 +148,21 @@ class LocalSearchService:
                 'subtitleText': entry['subtitle_text'],
                 'video_title': entry['videoTitle'],
                 'video_channel': entry['channel'],
+                'language': entry['language'],
+                'accent': entry['accent'],
+                'matchType': mode,
                 'score': score,
             })
 
         ranked.sort(key=lambda item: (-item['score'], item['timestamp']))
+        if randomize:
+            top_slice = ranked[:max_results * 3]
+            random.shuffle(top_slice)
+            ranked = top_slice + ranked[max_results * 3:]
         return ranked[:max_results]
 
-    def search_best(self, query: str, accent: str = 'us') -> Optional[dict]:
-        results = self.search(query, accent=accent, max_results=1)
+    def search_best(self, query: str, accent: str = 'all', mode: str = 'smart', randomize: bool = False) -> Optional[dict]:
+        results = self.search(query, accent=accent, max_results=1, mode=mode, randomize=randomize)
         if not results:
             return None
 
@@ -196,12 +234,16 @@ class LocalSearchService:
                 'subtitleText': text,
                 'video_title': transcript.get('title', ''),
                 'video_channel': transcript.get('channel', ''),
+                'language': transcript.get('language', 'en'),
+                'accent': self._infer_accent(transcript),
             })
 
         return {
             'videoId': transcript.get('videoId'),
             'title': transcript.get('title', ''),
             'channel': transcript.get('channel', ''),
+            'language': transcript.get('language', 'en'),
+            'accent': self._infer_accent(transcript),
             'captionCount': len(cleaned_captions),
             'subtitleTranscript': ' '.join(item['sentence'] for item in cleaned_captions),
             'captions': cleaned_captions,
