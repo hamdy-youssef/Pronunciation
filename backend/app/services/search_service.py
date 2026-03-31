@@ -55,7 +55,10 @@ class SearchService:
                         "properties": {
                             "text": {"type": "text", "analyzer": "standard"},
                             "videoId": {"type": "keyword"},
+                            "title": {"type": "text"},
+                            "channel": {"type": "text"},
                             "timestamp": {"type": "float"},
+                            "duration": {"type": "float"},
                             "original_text": {"type": "text"}
                         }
                     }
@@ -73,10 +76,32 @@ class SearchService:
             "videoId": video_id,
             "text": transcript_data.get('text', ''),
             "timestamp": transcript_data.get('timestamp', 0),
+            "duration": transcript_data.get('duration', 0),
+            "title": transcript_data.get('title', ''),
+            "channel": transcript_data.get('channel', ''),
             "original_text": transcript_data.get('original_text', '')
         }
         
         await self.es_client.index(index=self.index_name, document=doc)
+
+    async def seed_corpus(self, corpus: list):
+        if not self.es_client or not corpus:
+            return
+
+        await self.create_index()
+        for entry in corpus:
+            await self.es_client.index(
+                index=self.index_name,
+                document={
+                    "videoId": entry.get('videoId', ''),
+                    "text": entry.get('clean_text', entry.get('text', '')),
+                    "timestamp": entry.get('timestamp', 0),
+                    "duration": entry.get('duration', 0),
+                    "title": entry.get('videoTitle', ''),
+                    "channel": entry.get('channel', ''),
+                    "original_text": entry.get('text', ''),
+                },
+            )
 
     async def search(self, query: str, limit: int = 10) -> list:
         settings = get_settings()
@@ -99,11 +124,12 @@ class SearchService:
                     index=self.index_name,
                     body={
                         "query": {
-                            "multi_match": {
-                                "query": query,
-                                "fields": ["text^2", "original_text"],
-                                "type": "phrase_prefix",
-                                "fuzziness": "AUTO"
+                            "bool": {
+                                "should": [
+                                    {"match_phrase": {"text": {"query": query, "boost": 5}}},
+                                    {"match": {"text": {"query": query, "fuzziness": "AUTO", "boost": 3}}},
+                                    {"match": {"original_text": {"query": query, "fuzziness": "AUTO"}}},
+                                ]
                             }
                         },
                         "size": limit,

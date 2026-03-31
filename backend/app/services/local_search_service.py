@@ -1,63 +1,135 @@
 import json
-import os
 import logging
+import os
+import re
+from difflib import SequenceMatcher
 
 logger = logging.getLogger(__name__)
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), '..', 'data', 'transcripts.json')
+NOISE_PATTERNS = re.compile(r'\[(music|applause|laughter|noise|intro|outro)\]|^(music|applause|laughter)$', re.I)
 
 
 class LocalSearchService:
     def __init__(self):
         self.transcripts = []
+        self.entries = []
         self._load_data()
 
     def _load_data(self):
         try:
-            with open(DATA_FILE, 'r') as f:
+            with open(DATA_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 self.transcripts = data.get('transcripts', [])
-                logger.info(f"Loaded {len(self.transcripts)} video transcripts")
+                self.entries = self._build_entries(self.transcripts)
+                logger.info('Loaded %s transcripts and %s captions', len(self.transcripts), len(self.entries))
         except Exception as e:
-            logger.error(f"Failed to load transcripts: {e}")
+            logger.error('Failed to load transcripts: %s', e)
             self.transcripts = []
+            self.entries = []
 
-    def search(self, query: str, accent: str = "us", max_results: int = 20) -> list:
+    def _build_entries(self, transcripts: list) -> list:
+        entries = []
+
+        for video in transcripts:
+            captions = sorted(video.get('captions', []), key=lambda item: item.get('start', 0))
+
+            for index, cap in enumerate(captions):
+                text = (cap.get('text') or '').strip()
+                if not text or NOISE_PATTERNS.search(text):
+                    continue
+
+                start = float(cap.get('start', 0) or 0)
+                next_start = float(captions[index + 1].get('start', start + 3.5) or (start + 3.5)) if index + 1 < len(captions) else start + 3.5
+                duration = max(1.0, round(next_start - start, 2))
+
+                entries.append({
+                    'videoId': video.get('videoId'),
+                    'videoTitle': video.get('title', ''),
+                    'channel': video.get('channel', ''),
+                    'text': text,
+                    'clean_text': self._normalize(text),
+                    'timestamp': start,
+                    'duration': duration,
+                })
+
+        return entries
+
+    @staticmethod
+    def _normalize(text: str) -> str:
+        text = text.lower()
+        text = re.sub(r"[^\w\s]", ' ', text)
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()
+
+    def _score(self, query: str, entry: dict) -> float:
+        normalized_query = self._normalize(query)
+        normalized_text = entry.get('clean_text', '')
+
+        if not normalized_query or not normalized_text:
+            return 0.0
+
+        if normalized_query == normalized_text:
+            return 100.0
+
+        score = 0.0
+
+        if normalized_query in normalized_text:
+            score += 45.0
+
+        if normalized_text in normalized_query:
+            score += 18.0
+
+        query_words = set(normalized_query.split())
+        text_words = set(normalized_text.split())
+        if query_words:
+            overlap = len(query_words & text_words) / len(query_words)
+            score += overlap * 25.0
+
+        score += SequenceMatcher(None, normalized_query, normalized_text).ratio() * 20.0
+
+        if normalized_text.startswith(normalized_query):
+            score += 5.0
+
+        if len(normalized_query.split()) > 1 and normalized_query.replace(' ', '') == normalized_text.replace(' ', ''):
+            score += 6.0
+
+        return round(score, 3)
+
+    def search(self, query: str, accent: str = 'us', max_results: int = 50) -> list:
         if not query:
             return []
-        
-        query_lower = query.lower().strip()
-        results = []
-        
-        for video in self.transcripts:
-            captions = video.get('captions', [])
-            
-            for cap in captions:
-                text_lower = cap.get('text', '').lower()
-                
-                if query_lower in text_lower:
-                    results.append({
-                        'videoId': video.get('videoId'),
-                        'timestamp': cap.get('start', 0),
-                        'sentence': cap.get('text'),
-                        'video_title': video.get('title'),
-                        'video_channel': video.get('channel')
-                    })
-        
-        results.sort(key=lambda x: x['timestamp'])
-        
-        return results[:max_results]
+
+        ranked = []
+        for entry in self.entries:
+            score = self._score(query, entry)
+            if score <= 0:
+                continue
+
+            ranked.append({
+                'videoId': entry['videoId'],
+                'timestamp': entry['timestamp'],
+                'duration': entry['duration'],
+                'sentence': entry['text'],
+                'video_title': entry['videoTitle'],
+                'video_channel': entry['channel'],
+                'score': score,
+            })
+
+        ranked.sort(key=lambda item: (-item['score'], item['timestamp']))
+        return ranked[:max_results]
+
+    def search_best(self, query: str, accent: str = 'us') -> dict | None:
+        results = self.search(query, accent=accent, max_results=1)
+        return results[0] if results else None
 
     def get_all_words(self) -> list:
         words = set()
-        for video in self.transcripts:
-            for cap in video.get('captions', []):
-                text = cap.get('text', '').lower()
-                for word in text.split():
-                    cleaned = ''.join(c for c in word if c.isalpha())
-                    if len(cleaned) > 2:
-                        words.add(cleaned)
-        return sorted(list(words))[:100]
+        for entry in self.entries:
+            for word in entry.get('clean_text', '').split():
+                if len(word) > 2:
+                    words.add(word)
+        return sorted(words)[:100]
 
 
 local_search_service = LocalSearchService()

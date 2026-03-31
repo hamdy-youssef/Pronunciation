@@ -1,11 +1,14 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, validator
-from app.services.youtube_service import youtube_service
-from app.services.transcript_service import transcript_service
-from app.services.translation_service import translation_service
-from app.services.local_search_service import local_search_service
 import logging
 import re
+
+from typing import Optional
+
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
+from app.services.local_search_service import local_search_service
+from app.services.translation_service import translation_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -13,42 +16,48 @@ router = APIRouter()
 
 class TranslateRequest(BaseModel):
     text: str
-    target_lang: str = "en"
+    target_lang: Optional[str] = None
 
 
-@router.get("/search")
-async def search(q: str, accent: str = "us"):
-    if not q or len(q.strip()) < 2:
-        raise HTTPException(status_code=400, detail="Query must be at least 2 characters")
-    
-    if not re.match(r'^[a-zA-Z\s]+$', q):
-        raise HTTPException(status_code=400, detail="Only letters and spaces allowed")
-    
-    query = q.strip().lower()
-    
+@router.get('/search')
+async def search(q: str):
+    query = (q or '').strip()
+
+    if len(query) < 2:
+        return JSONResponse(status_code=400, content={'error': 'Query must be at least 2 characters'})
+
+    if not re.match(r'^[a-zA-Z\s]+$', query):
+        return JSONResponse(status_code=400, content={'error': 'Only letters and spaces are allowed'})
+
     try:
-        results = local_search_service.search(query, accent, max_results=20)
-        
-        if not results:
-            available = local_search_service.get_all_words()[:10]
-            return {
-                "error": f"No matches found for '{query}'. Try: " + ", ".join(available),
-                "available_words": available
-            }
-        
-        return {"results": results, "count": len(results)}
-    
+        result = local_search_service.search_best(query)
+
+        if not result:
+            return JSONResponse(status_code=404, content={'error': 'No match found'})
+
+        return {
+            'videoId': result['videoId'],
+            'timestamp': result['timestamp'],
+            'duration': result.get('duration', 3.5),
+            'sentence': result['sentence'],
+            'videoTitle': result.get('video_title', ''),
+            'channel': result.get('video_channel', ''),
+            'score': result.get('score', 0),
+        }
     except Exception as e:
-        logger.error(f"Search error: {e}")
-        return {"error": f"Search failed: {str(e)}. Please try again later."}
+        logger.error('Search error: %s', e)
+        return JSONResponse(status_code=500, content={'error': 'Search failed'})
 
 
-@router.post("/translate")
+@router.post('/translate')
 async def translate(request: TranslateRequest):
-    result = await translation_service.translate(request.text, request.target_lang)
-    return result
+    try:
+        return await translation_service.translate(request.text, request.target_lang)
+    except Exception as e:
+        logger.error('Translate error: %s', e)
+        return JSONResponse(status_code=500, content={'error': 'Translation failed'})
 
 
-@router.get("/health")
+@router.get('/health')
 async def health():
-    return {"status": "healthy"}
+    return {'status': 'healthy'}
