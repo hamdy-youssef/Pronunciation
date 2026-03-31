@@ -356,6 +356,11 @@
     <span id="errorText">Something went wrong.</span>
   </div>
 
+  <div class="videos-list" id="videosList">
+    <div class="videos-header">Found <span id="videoCount">0</span> videos with "<span id="searchWordDisplay"></span>"</div>
+    <div id="videosContainer"></div>
+  </div>
+
   <div class="player-section" id="playerSection">
     <div class="player-wrap">
       <div class="player-now-playing">
@@ -646,19 +651,37 @@ async function doSearch() {
   hidePlayer();
 
   document.getElementById('searchBtn').disabled = true;
-  setStatus(`Loading...`);
+  setStatus(`Searching YouTube for "${q}"...`);
 
   try {
     const rawVideos = await searchYouTube(q);
 
     if (!rawVideos.length) {
-      showError("No videos found.");
+      showError("No results found. Try a different word.");
       return;
     }
 
-    videos = rawVideos;
-    playVideoAtTime(0, 0);
-    hideStatus();
+    videos = rawVideos.map(v => ({
+      ...v,
+      duration: 'PT0M0S',
+      fullDetails: null
+    }));
+
+    displayVideosList();
+    setStatus(`Found ${videos.length} videos. Looking for "${q}" in transcripts...`);
+    
+    const result = await findWordInVideos(currentSearchWord);
+    
+    if (result) {
+      playVideoAtTime(result.index, result.startTime);
+      hideStatus();
+    } else {
+      hideStatus();
+      if (videos.length > 0) {
+        showError(`No transcript found. Playing first video from start.`);
+        playVideoAtTime(0, 0);
+      }
+    }
 
   } catch (err) {
     console.error('Search error:', err);
@@ -968,6 +991,7 @@ function hideError() {
 function hidePlayer() {
   document.getElementById('playerSection').classList.remove('visible');
   document.getElementById('subtitleSection').classList.remove('visible');
+  document.getElementById('videosList').classList.remove('visible');
 }
 
 document.getElementById('searchInput').addEventListener('keydown', e => {
