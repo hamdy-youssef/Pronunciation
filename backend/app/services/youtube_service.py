@@ -7,105 +7,91 @@ import xml.etree.ElementTree as ET
 logger = logging.getLogger(__name__)
 
 INVIDIOUS_INSTANCES = [
-    'https://invidious.fdn.fr',
-    'https://invidious.snopyta.org',
-    'https://yewtu.be',
-    'https://redirect.invidious.io',
+    'https://invidious.projectsegfau.lt',
+    'https://invidious.tiekoetter.com',
+    'https://vid.puffyan.us',
+    'https://iv.ggtyler.dev',
 ]
 
 
 class YoutubeService:
     def __init__(self):
-        pass
+        self._session = None
+
+    async def get_session(self) -> httpx.AsyncClient:
+        if self._session is None:
+            self._session = httpx.AsyncClient(
+                timeout=15.0,
+                follow_redirects=True,
+                headers={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'}
+            )
+        return self._session
+
+    async def close(self):
+        if self._session:
+            await self._session.aclose()
+            self._session = None
 
     async def get_captions(self, video_id: str) -> list:
+        client = await self.get_session()
+        
         for instance in INVIDIOUS_INSTANCES:
             try:
-                url = f"{instance}/api/v1/captions/{video_id}"
-                async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
-                    resp = await client.get(url)
-                    if resp.status_code == 200:
-                        data = resp.json()
+                resp = await client.get(f"{instance}/api/v1/captions/{video_id}")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data and len(data) > 0:
                         for cap in data:
                             if cap.get('languageCode') == 'en':
                                 caption_url = cap.get('url')
                                 if caption_url:
-                                    return await self._fetch_caption_from_url(caption_url)
+                                    return await self._fetch_caption(caption_url, client)
             except Exception as e:
-                logger.debug(f"Invidious captions failed for {video_id}: {e}")
+                logger.debug(f"Instance {instance} failed: {e}")
                 continue
         
-        return await self._get_captions_from_youtube_direct(video_id)
+        return await self._get_captions_yt_direct(video_id, client)
 
-    async def _fetch_caption_from_url(self, url: str) -> list:
+    async def _fetch_caption(self, url: str, client: httpx.AsyncClient) -> list:
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                resp = await client.get(url)
-                if resp.status_code == 200:
-                    text = resp.text
-                    if not text:
-                        return []
-                    
-                    if 'json3' in url or url.endswith('.json'):
-                        return self._parse_json3(text)
-                    elif 'srv3' in url or url.endswith('.srv3'):
-                        return self._parse_srv3(text)
-                    elif 'vtt' in url or url.endswith('.vtt'):
-                        return self._parse_vtt(text)
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                text = resp.text
+                if not text or len(text) < 10:
+                    return []
+                
+                if url.endswith('.json3') or 'json3' in url:
+                    return self._parse_json3(text)
+                elif url.endswith('.srv3') or 'srv3' in url:
+                    return self._parse_srv3(text)
+                elif url.endswith('.vtt') or 'vtt' in url:
+                    return self._parse_vtt(text)
         except Exception as e:
-            logger.debug(f"Failed to fetch caption: {e}")
+            logger.debug(f"Fetch caption failed: {e}")
         
         return []
 
-    async def _get_captions_from_youtube_direct(self, video_id: str) -> list:
-        try:
-            import yt_dlp
-        except ImportError:
-            return []
+    async def _get_captions_yt_direct(self, video_id: str, client: httpx.AsyncClient) -> list:
+        urls = [
+            f"https://www.youtube.com/api/timedtext?lang=en&v={video_id}&fmt=json3",
+            f"https://www.youtube.com/api/timedtext?lang=en&v={video_id}&fmt=srv3",
+            f"https://www.youtube.com/api/timedtext?lang=en&v={video_id}&fmt=vtt",
+        ]
         
-        loop = asyncio.get_event_loop()
-        
-        def fetch():
-            ydl_opts = {
-                'quiet': True,
-                'no_warnings': True,
-                'skip_download': True,
-                'nocheckcertificate': True,
-            }
-            
+        for url in urls:
             try:
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(
-                        f'https://www.youtube.com/watch?v={video_id}',
-                        download=False,
-                        process=False
-                    )
-                    
-                    subs = info.get('subtitles') or info.get('automatic_captions')
-                    
-                    if subs and 'en' in subs:
-                        for fmt in subs['en']:
-                            caption_url = fmt.get('url')
-                            if caption_url:
-                                try:
-                                    resp = httpx.get(caption_url, timeout=10.0)
-                                    if resp.status_code == 200:
-                                        text = resp.text
-                                        if 'json3' in caption_url:
-                                            return self._parse_json3(text)
-                                        elif 'srv3' in caption_url:
-                                            return self._parse_srv3(text)
-                                        elif 'vtt' in caption_url:
-                                            return self._parse_vtt(text)
-                                except:
-                                    continue
-                                    
-            except Exception as e:
-                logger.debug(f"yt-dlp failed for {video_id}: {e}")
-            
-            return []
+                resp = await client.get(url)
+                if resp.status_code == 200 and len(resp.text) > 10:
+                    if 'json3' in url:
+                        return self._parse_json3(resp.text)
+                    elif 'srv3' in url:
+                        return self._parse_srv3(resp.text)
+                    elif 'vtt' in url:
+                        return self._parse_vtt(resp.text)
+            except:
+                continue
         
-        return await loop.run_in_executor(None, fetch)
+        return []
 
     def _parse_json3(self, text: str) -> list:
         captions = []
@@ -184,10 +170,6 @@ class YoutubeService:
             if len(parts) == 2:
                 mins = int(parts[0])
                 secs = float(parts[1])
-            elif len(parts) == 3:
-                hours = int(parts[0])
-                mins = int(parts[1])
-                secs = float(parts[2])
             else:
                 return 0, 3
             
@@ -198,33 +180,34 @@ class YoutubeService:
 
     async def search_videos(self, query: str, accent: str = "us", max_results: int = 20) -> list:
         accent_query = {
-            'us': 'american accent interview',
-            'uk': 'british accent bbc interview',
-            'au': 'australian accent interview'
-        }.get(accent, 'interview')
+            'us': 'american accent',
+            'uk': 'british accent bbc',
+            'au': 'australian accent'
+        }.get(accent, '')
         
         search_query = f"{query} {accent_query}".strip()
+        client = await self.get_session()
         
         for instance in INVIDIOUS_INSTANCES:
             try:
-                url = f"{instance}/api/v1/search?q={search_query}&type=video&max_results={max_results}"
-                async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
-                    resp = await client.get(url)
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        videos = []
-                        for item in data:
-                            if item.get('type') == 'video':
-                                videos.append({
-                                    'id': item.get('videoId'),
-                                    'title': item.get('title'),
-                                    'channel': item.get('author')
-                                })
-                        if videos:
-                            logger.info(f"Found {len(videos)} videos via {instance}")
-                            return videos
+                resp = await client.get(
+                    f"{instance}/api/v1/search?q={search_query}&type=video&max_results={max_results}"
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    videos = []
+                    for item in data:
+                        if item.get('type') == 'video':
+                            videos.append({
+                                'id': item.get('videoId'),
+                                'title': item.get('title'),
+                                'channel': item.get('author')
+                            })
+                    if videos:
+                        logger.info(f"Found {len(videos)} videos via {instance}")
+                        return videos
             except Exception as e:
-                logger.debug(f"Invidious search failed: {e}")
+                logger.debug(f"Search failed on {instance}: {e}")
                 continue
         
         return self._search_with_ytdlp(search_query, max_results)

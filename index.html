@@ -623,7 +623,9 @@
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
-const API_BASE = 'http://localhost:8000';
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+  ? 'http://localhost:8000' 
+  : `http://${window.location.hostname}:8000`;
 
 let state = {
   accent: 'us',
@@ -634,6 +636,22 @@ let state = {
   isPlaying: false,
   isSearching: false
 };
+
+async function checkConnection() {
+  try {
+    const res = await fetch(`${API_BASE}/health`, { method: 'GET', mode: 'cors' });
+    if (res.ok) return true;
+  } catch (e) {
+    console.log('Backend not reachable:', e);
+  }
+  return false;
+}
+
+checkConnection().then(connected => {
+  if (!connected) {
+    document.getElementById('connectionAlert').classList.add('show');
+  }
+});
 
 function onYouTubeIframeAPIReady() {
   state.player = new YT.Player('youtubePlayer', {
@@ -759,13 +777,20 @@ async function startSearch() {
     const data = await response.json();
     
     if (data.error) {
-      throw new Error(data.error);
+      if (data.available_words) {
+        showError(`${data.error}`);
+      } else {
+        throw new Error(data.error);
+      }
+      setLoading(false);
+      state.isSearching = false;
+      return;
     }
     
     state.occurrences = data.results || [];
     
     if (state.occurrences.length === 0) {
-      showError(`No matches found for "${query}". Try a different word or check your spelling.`);
+      showError(`No matches found for "${query}". Try a different word.`);
       setLoading(false);
       state.isSearching = false;
       return;
@@ -784,7 +809,7 @@ async function startSearch() {
     setLoading(false);
     state.isSearching = false;
     
-    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError') || error.message.includes('Network request failed')) {
       document.getElementById('connectionAlert').classList.add('show');
     } else {
       showError(error.message || 'An unexpected error occurred. Please try again.');
