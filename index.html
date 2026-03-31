@@ -140,7 +140,8 @@
     color: var(--muted); font-family: 'Syne', sans-serif;
     font-size: 14px; font-weight: 700; letter-spacing: 0.05em;
     cursor: pointer; transition: all 0.2s;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; align-items: center;
+    justify-content: center;
     gap: 8px; position: relative; overflow: hidden;
   }
   .accent-btn .flag { font-size: 20px; }
@@ -339,6 +340,32 @@
   }
   .error-bar.visible { display: flex; }
 
+  .debug-panel {
+    display: none;
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .debug-panel.visible {
+    display: block;
+  }
+  .debug-log {
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .debug-log.error {
+    color: var(--danger);
+  }
+  .debug-log.success {
+    color: var(--accent);
+  }
+
   @keyframes fadeDown {
     from { opacity: 0; transform: translateY(-12px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -353,6 +380,7 @@
     .ctrl-btn { min-width: 36px; height: 36px; padding: 0 10px; }
   }
 </style>
+<base target="_blank">
 </head>
 <body>
   <div class="page-wrapper">
@@ -383,8 +411,7 @@
         <span class="flag">🇬🇧</span> British English
       </button>
     </div>
-    
-    <!-- Translation Section -->
+
     <div class="translate-section" id="translateSection">
       <div class="translate-label">Translation</div>
       <div class="translate-text" id="translateText"></div>
@@ -447,6 +474,11 @@
     </div>
   </div>
 
+  <div class="debug-panel" id="debugPanel">
+    <div style="color: var(--accent); margin-bottom: 8px; font-weight: 600;">Debug Log</div>
+    <div id="debugLogs"></div>
+  </div>
+
 </div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
@@ -454,26 +486,40 @@
 const API_KEY = 'AIzaSyDGM1AMLvdPGn3fRw79pGMSRVuHfaHjEWc';
 
 let currentAccent = 'US';
-let videos        = [];
-let currentIndex  = 0;
-let player        = null;
-let playerReady   = false;
-let captions      = [];
-let captionTimer  = null;
+let videos = [];
+let currentIndex = 0;
+let player = null;
+let playerReady = false;
+let captions = [];
+let captionTimer = null;
 let progressTimer = null;
-let lastWord      = '';
-let isPlaying     = false;
+let lastWord = '';
+let isPlaying = false;
 let currentTranscript = [];
-let wordTimings   = [];
+let wordTimings = [];
+let currentSearchWord = '';
 
-// ── YouTube API ─────────────────────────────────────────
+function debugLog(message, type = 'info') {
+  console.log(`[${type.toUpperCase()}] ${message}`);
+}
+
 function onYouTubeIframeAPIReady() {
+  debugLog('YouTube IFrame API Ready');
   player = new YT.Player('playerContainer', {
-    height: '100%', width: '100%',
+    height: '100%', 
+    width: '100%',
     videoId: '',
-    playerVars: { autoplay: 1, rel: 0 },
+    playerVars: { 
+      autoplay: 1, 
+      rel: 0,
+      enablejsapi: 1,
+      origin: window.location.origin
+    },
     events: {
-      onReady: () => { playerReady = true; },
+      onReady: () => { 
+        playerReady = true; 
+        debugLog('Player ready');
+      },
       onStateChange: onStateChange,
       onError: onPlayerError
     }
@@ -483,6 +529,18 @@ function onYouTubeIframeAPIReady() {
 function onStateChange(e) {
   isPlaying = e.data === YT.PlayerState.PLAYING;
 
+  const playIcon = document.getElementById('playIcon');
+  const pauseIcon = document.getElementById('pauseIcon');
+  if (playIcon && pauseIcon) {
+    if (isPlaying) {
+      playIcon.style.display = 'none';
+      pauseIcon.style.display = 'block';
+    } else {
+      playIcon.style.display = 'block';
+      pauseIcon.style.display = 'none';
+    }
+  }
+
   if (isPlaying) {
     startProgress();
     startCaptionSync();
@@ -490,107 +548,188 @@ function onStateChange(e) {
     stopProgress();
   }
 
-  if (e.data === YT.PlayerState.ENDED) nextVideo();
+  if (e.data === YT.PlayerState.ENDED) {
+    debugLog('Video ended, playing next');
+    nextVideo();
+  }
 }
 
 function onPlayerError(e) {
-  console.warn("Video error:", e.data);
+  debugLog(`Player error: ${e.data}`, 'error');
   showError("This video can't be played. Trying next...");
-  setTimeout(() => nextVideo(), 1200);
+  setTimeout(() => nextVideo(), 1500);
 }
 
-// ── Accent ─────────────────────────────────────────────
 function setAccent(a) {
   currentAccent = a;
   document.querySelectorAll('.accent-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.accent === a)
   );
-  document.getElementById('accentBadge').textContent = a;
-  document.getElementById('accentBadge').className   = `now-accent-badge ${a}`;
+  const badge = document.getElementById('accentBadge');
+  if (badge) {
+    badge.textContent = a;
+    badge.className = `now-accent-badge ${a}`;
+  }
 }
 
-// ── Translation ─────────────────────────────────────────
 async function translateText() {
   const text = lastWord;
   if (!text) return;
-  
+
   const translateBtn = document.querySelector('.translate-btn');
   translateBtn.textContent = 'Translating...';
-  
+
   try {
-    // Using a free translation API (MyMemory)
     const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|ar`);
     const data = await response.json();
-    
+
     if (data.responseData && data.responseData.translatedText) {
       document.getElementById('translateText').textContent = data.responseData.translatedText;
     } else {
       document.getElementById('translateText').textContent = 'Translation not available';
     }
   } catch (err) {
-    console.error('Translation error:', err);
+    debugLog(`Translation error: ${err.message}`, 'error');
     document.getElementById('translateText').textContent = 'Error translating text';
   } finally {
     translateBtn.textContent = '🌐 Translate';
   }
 }
 
-// ── Transcript Fetching ─────────────────────────────────
 async function fetchTranscript(videoId) {
+  debugLog(`Fetching transcript for ${videoId}`);
+
   try {
-    // Try multiple transcript sources
-    const sources = [
-      `https://yt.lemnoslife.com/videos?part=snippet&id=${videoId}`,
+    const captionUrl = `https://www.youtube.com/api/timedtext?type=list&v=${videoId}`;
+
+    const proxyUrls = [
+      `https://corsproxy.io/?${encodeURIComponent(captionUrl)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(captionUrl)}`
     ];
-    
-    // Use Supadata API for transcripts (free tier available)
-    const transcriptRes = await fetch(`https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}`, {
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
-    
-    if (transcriptRes.ok) {
-      const data = await transcriptRes.json();
-      if (data.transcript) {
-        return data.transcript.map(item => ({
-          text: item.text,
-          start: parseFloat(item.start),
-          duration: parseFloat(item.duration || 0)
-        }));
+
+    for (const proxyUrl of proxyUrls) {
+      try {
+        const response = await fetch(proxyUrl);
+        if (response.ok) {
+          const text = await response.text();
+          debugLog(`Got caption list response, length: ${text.length}`);
+
+          if (text.includes('lang_code')) {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(text, "text/xml");
+            const tracks = xmlDoc.querySelectorAll('track');
+
+            if (tracks.length > 0) {
+              let selectedTrack = Array.from(tracks).find(t => 
+                t.getAttribute('lang_code')?.startsWith('en')
+              ) || tracks[0];
+
+              const langCode = selectedTrack.getAttribute('lang_code');
+              const name = selectedTrack.getAttribute('name') || '';
+
+              const transcriptUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${langCode}&name=${encodeURIComponent(name)}`;
+              const transcriptProxyUrl = `https://corsproxy.io/?${encodeURIComponent(transcriptUrl)}`;
+
+              const transcriptRes = await fetch(transcriptProxyUrl);
+              if (transcriptRes.ok) {
+                const transcriptText = await transcriptRes.text();
+                const parsed = parseTranscriptXML(transcriptText);
+                if (parsed.length > 0) {
+                  debugLog(`Successfully parsed ${parsed.length} transcript segments`);
+                  return parsed;
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugLog(`Proxy failed: ${e.message}`, 'error');
+        continue;
       }
     }
-    
-    // Fallback: try to get captions via YouTube Data API
-    const captionRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${API_KEY}`
-    );
-    
-    if (captionRes.ok) {
-      const captionData = await captionRes.json();
-      console.log('Captions available:', captionData.items);
-    }
-    
-    return [];
   } catch (err) {
-    console.error('Error fetching transcript:', err);
-    return [];
+    debugLog(`Caption list fetch failed: ${err.message}`, 'error');
   }
+
+  debugLog('All transcript methods failed', 'error');
+  return [];
 }
 
-// ── Search ─────────────────────────────────────────────
-document.getElementById('searchInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doSearch();
-});
+function parseTranscriptXML(xmlText) {
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+  const texts = xmlDoc.querySelectorAll('text');
+
+  const transcript = [];
+  texts.forEach((node) => {
+    const start = parseFloat(node.getAttribute('start')) || 0;
+    const duration = parseFloat(node.getAttribute('dur')) || 
+                     parseFloat(node.getAttribute('duration')) || 2;
+    const text = node.textContent.trim();
+
+    if (text) {
+      transcript.push({
+        text: text,
+        start: start,
+        duration: duration,
+        end: start + duration
+      });
+    }
+  });
+
+  return transcript;
+}
+
+async function fetchTranscriptAlternative(videoId) {
+  debugLog(`Trying alternative transcript method for ${videoId}`);
+
+  try {
+    const videoPageUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(videoPageUrl)}`;
+
+    const response = await fetch(proxyUrl);
+    if (!response.ok) return [];
+
+    const html = await response.text();
+
+    const captionRegex = /"captionTracks":\s*(\[.*?\])/;
+    const match = html.match(captionRegex);
+
+    if (match) {
+      try {
+        const captionTracks = JSON.parse(match[1]);
+        debugLog(`Found ${captionTracks.length} caption tracks in page`);
+
+        const enTrack = captionTracks.find(t => 
+          t.languageCode === 'en' || t.languageCode === 'en-US' || t.languageCode === 'en-GB'
+        ) || captionTracks[0];
+
+        if (enTrack && enTrack.baseUrl) {
+          const transcriptRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(enTrack.baseUrl)}`);
+          if (transcriptRes.ok) {
+            const xmlText = await transcriptRes.text();
+            return parseTranscriptXML(xmlText);
+          }
+        }
+      } catch (e) {
+        debugLog(`Error parsing caption tracks: ${e.message}`, 'error');
+      }
+    }
+  } catch (err) {
+    debugLog(`Alternative method failed: ${err.message}`, 'error');
+  }
+
+  return [];
+}
 
 async function doSearch() {
   const q = document.getElementById('searchInput').value.trim();
   if (!q) return;
 
+  currentSearchWord = q.toLowerCase();
   lastWord = q;
   hideError();
-  
-  // Show translation section
+
   document.getElementById('translateSection').classList.add('visible');
   document.getElementById('translateText').textContent = '';
 
@@ -598,34 +737,42 @@ async function doSearch() {
   document.getElementById('searchBtn').disabled = true;
 
   const accentLabel = currentAccent === 'US'
-    ? 'American English pronunciation'
-    : 'British English pronunciation';
+    ? 'American English pronunciation how to pronounce'
+    : 'British English pronunciation how to pronounce';
 
   try {
-    // Search videos
     const searchRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12&q=${encodeURIComponent(q + " " + accentLabel)}&key=${API_KEY}`
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=50&q=${encodeURIComponent(q + " " + accentLabel)}&key=${API_KEY}`
     );
 
     const searchData = await searchRes.json();
 
+    if (searchData.error) {
+      throw new Error(searchData.error.message);
+    }
+
     let rawVideos = (searchData.items || []).filter(v => v.id?.videoId);
+    debugLog(`Found ${rawVideos.length} raw videos`);
 
     if (!rawVideos.length) {
-      showError("No results found.");
+      showError("No results found. Try a different word.");
       return;
     }
 
-    // Filter embeddable videos
     const ids = rawVideos.map(v => v.id.videoId).join(',');
 
     const videoRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=status,contentDetails&id=${ids}&key=${API_KEY}`
+      `https://www.googleapis.com/youtube/v3/videos?part=status,contentDetails,snippet&id=${ids}&key=${API_KEY}`
     );
 
     const videoData = await videoRes.json();
 
-    const embeddableVideos = videoData.items.filter(v => v.status.embeddable);
+    const embeddableVideos = videoData.items.filter(v => {
+      const status = v.status;
+      return status.embeddable && 
+             !status.uploadStatus === 'rejected' &&
+             !status.privacyStatus === 'private';
+    });
 
     videos = rawVideos.filter(v => 
       embeddableVideos.some(ev => ev.id === v.id.videoId)
@@ -633,66 +780,124 @@ async function doSearch() {
       const details = embeddableVideos.find(ev => ev.id === v.id.videoId);
       return {
         ...v,
-        duration: details?.contentDetails?.duration || 'PT0M0S'
+        duration: details?.contentDetails?.duration || 'PT0M0S',
+        fullDetails: details
       };
     });
 
+    debugLog(`Found ${videos.length} embeddable videos`);
+
     if (!videos.length) {
-      showError("No embeddable videos found. Try another word.");
+      showError("No playable videos found. Try another word.");
       return;
     }
 
-    // Find the video with the word and jump to timestamp
     await findAndPlayWord(q);
 
   } catch (err) {
-    console.error(err);
-    showError("Something went wrong.");
+    debugLog(`Search error: ${err.message}`, 'error');
+    showError("Search failed: " + err.message);
   } finally {
     hideStatus();
     document.getElementById('searchBtn').disabled = false;
   }
 }
 
-// Ensure this part of your code is actually receiving data
 async function findAndPlayWord(word) {
-  // ... after you get your transcript JSON from an external API ...
-  if (match) {
-    currentIndex = i;
-    // CRITICAL: Use seekTo immediately after loading
-    player.loadVideoById({
-      videoId: videoId,
-      startSeconds: Math.floor(match.start) // Jump directly to the word
-    });
-    
-    // Force the subtitles to update
-    currentTranscript = transcript;
-    buildWordTimings(transcript);
+  const wordLower = word.toLowerCase().trim();
+  debugLog(`Searching for word: "${wordLower}"`);
+
+  const videosToCheck = videos.slice(0, 15);
+
+  for (let i = 0; i < videosToCheck.length; i++) {
+    const video = videosToCheck[i];
+    const videoId = video.id.videoId;
+
+    setStatus(`Checking video ${i + 1}/${videosToCheck.length} for "${word}"...`);
+
+    let transcript = await fetchTranscript(videoId);
+
+    if (!transcript.length) {
+      transcript = await fetchTranscriptAlternative(videoId);
+    }
+
+    if (transcript && transcript.length > 0) {
+      debugLog(`Video ${i + 1}: Got ${transcript.length} transcript segments`);
+
+      let match = null;
+
+      match = transcript.find(item => {
+        const words = item.text.toLowerCase().match(/[a-z]+/g) || [];
+        return words.includes(wordLower);
+      });
+
+      if (!match) {
+        match = transcript.find(item => 
+          item.text.toLowerCase().includes(wordLower)
+        );
+      }
+
+      if (!match && wordLower.length > 3) {
+        match = transcript.find(item => {
+          const text = item.text.toLowerCase();
+          return text.includes(wordLower.slice(0, -1)) ||
+                 text.includes(wordLower + 's') ||
+                 text.includes(wordLower + 'es') ||
+                 text.includes(wordLower + 'ed') ||
+                 text.includes(wordLower + 'ing');
+        });
+      }
+
+      if (match) {
+        debugLog(`Found "${word}" at ${match.start}s in video ${videoId}`, 'success');
+
+        currentIndex = videos.indexOf(video);
+        currentTranscript = transcript;
+
+        buildWordTimings(transcript);
+
+        playVideoAtTime(currentIndex, match.start);
+
+        setStatus(`Found "${word}" at ${formatTime(match.start)}!`);
+        setTimeout(hideStatus, 2000);
+
+        return;
+      } else {
+        debugLog(`Word "${word}" not found in video ${i + 1} transcript`);
+      }
+    } else {
+      debugLog(`No transcript available for video ${i + 1}`);
+    }
   }
-}
-  
-  // If no specific match found, play first video from start
+
+  debugLog(`Word not found in any checked video, playing from start`, 'error');
+  showError(`Could not find "${word}" in video transcripts. Playing from beginning.`);
   playVideo(0);
 }
 
 function buildWordTimings(transcript) {
   wordTimings = [];
-  
+
   transcript.forEach(segment => {
     const words = segment.text.split(/\s+/);
-    const durationPerWord = segment.duration / words.length;
-    
+    const durationPerWord = segment.duration / Math.max(words.length, 1);
+
     words.forEach((word, index) => {
-      wordTimings.push({
-        word: word,
-        start: segment.start + (index * durationPerWord),
-        end: segment.start + ((index + 1) * durationPerWord)
-      });
+      const cleanWord = word.replace(/[^a-zA-Z0-9]/g, '');
+      if (cleanWord) {
+        wordTimings.push({
+          word: cleanWord,
+          start: segment.start + (index * durationPerWord),
+          end: segment.start + ((index + 1) * durationPerWord),
+          fullText: word
+        });
+      }
     });
   });
+
+  debugLog(`Built ${wordTimings.length} word timings`);
 }
 
-// ── Player ─────────────────────────────────────────────
 function playVideoAtTime(index, startTime) {
   if (!videos[index]) return;
 
@@ -703,62 +908,87 @@ function playVideoAtTime(index, startTime) {
   document.getElementById('subtitleSection').classList.add('visible');
   document.getElementById('nowTitle').textContent = videos[index].snippet.title;
 
-  if (playerReady) {
+  debugLog(`Playing video ${vid} at ${startTime}s`);
+
+  if (playerReady && player) {
     player.loadVideoById({
       videoId: vid,
-      startSeconds: startTime
+      startSeconds: startTime,
+      suggestedQuality: 'default'
     });
+
+    setTimeout(() => {
+      if (player && player.seekTo) {
+        player.seekTo(startTime, true);
+        player.playVideo();
+      }
+    }, 500);
+  } else {
+    debugLog('Player not ready, retrying...', 'error');
+    setTimeout(() => playVideoAtTime(index, startTime), 500);
   }
-  
-  // Display initial subtitle
+
   updateSubtitleDisplay(startTime);
 }
 
 function playVideo(index) {
-  if (!videos[index]) return;
-
-  currentIndex = index;
-  const vid = videos[index].id.videoId;
-
-  document.getElementById('playerSection').classList.add('visible');
-  document.getElementById('subtitleSection').classList.add('visible');
-  document.getElementById('nowTitle').textContent = videos[index].snippet.title;
-
-  if (playerReady) {
-    player.loadVideoById(vid);
-  }
-  
-  // Fetch transcript for this video
-  fetchTranscript(vid).then(transcript => {
-    currentTranscript = transcript;
-    buildWordTimings(transcript);
-  });
+  playVideoAtTime(index, 0);
 }
 
 function nextVideo() {
   if (currentIndex < videos.length - 1) {
-    playVideo(currentIndex + 1);
+    findAndPlayWordInVideo(currentIndex + 1, currentSearchWord);
   } else {
-    showError("No more playable videos.");
+    showError("No more videos available.");
   }
 }
 
 function prevVideo() {
   if (currentIndex > 0) {
-    playVideo(currentIndex - 1);
+    findAndPlayWordInVideo(currentIndex - 1, currentSearchWord);
   }
+}
+
+async function findAndPlayWordInVideo(index, word) {
+  if (!videos[index]) return;
+
+  const video = videos[index];
+  const videoId = video.id.videoId;
+
+  setStatus(`Checking next video for "${word}"...`);
+
+  let transcript = await fetchTranscript(videoId);
+  if (!transcript.length) {
+    transcript = await fetchTranscriptAlternative(videoId);
+  }
+
+  if (transcript.length > 0) {
+    currentTranscript = transcript;
+    buildWordTimings(transcript);
+
+    const wordLower = word.toLowerCase();
+    const match = transcript.find(item => 
+      item.text.toLowerCase().includes(wordLower)
+    );
+
+    if (match) {
+      playVideoAtTime(index, match.start);
+    } else {
+      playVideo(index);
+    }
+  } else {
+    playVideo(index);
+  }
+
+  hideStatus();
 }
 
 function togglePlay() {
   if (!player) return;
   if (isPlaying) {
     player.pauseVideo();
-    document.getElementById('playIcon').style.display = 'block';
-    document.getElementById('pauseIcon').style.display = 'none';
   } else {
     player.playVideo();
-    document.getElementById('playIcon').style.display = 'none';
-    document.getElementById('pauseIcon').style.display = 'block';
   }
 }
 
@@ -776,40 +1006,46 @@ function seekByClick(e) {
   player.seekTo(pct * dur, true);
 }
 
-// ── Caption Sync ───────────────────────────────────────
 function startCaptionSync() {
   if (captionTimer) clearInterval(captionTimer);
-  
+
   captionTimer = setInterval(() => {
     if (!player || !currentTranscript.length) return;
-    
-    const currentTime = player.getCurrentTime();
-    updateSubtitleDisplay(currentTime);
+
+    try {
+      const currentTime = player.getCurrentTime();
+      updateSubtitleDisplay(currentTime);
+    } catch (e) {
+    }
   }, 100);
 }
 
 function updateSubtitleDisplay(currentTime) {
   const subtitleBox = document.getElementById('subtitleBox');
   const subStatus = document.getElementById('subStatus');
-  
-  // Find current segment
+
+  if (!subtitleBox || !subStatus) return;
+
   const currentSegment = currentTranscript.find(seg => 
     currentTime >= seg.start && currentTime <= (seg.start + seg.duration)
   );
-  
+
   if (currentSegment) {
-    // Highlight the specific word being spoken
     const highlightedText = highlightCurrentWord(currentSegment.text, currentTime);
     subtitleBox.innerHTML = highlightedText;
     subStatus.textContent = 'live';
     subStatus.classList.add('live');
     subtitleBox.classList.add('active');
   } else {
-    // Show next upcoming segment or placeholder
     const nextSegment = currentTranscript.find(seg => seg.start > currentTime);
-    if (nextSegment) {
+    if (nextSegment && (nextSegment.start - currentTime) < 3) {
       subtitleBox.innerHTML = `<span class="sub-placeholder">${nextSegment.text}</span>`;
       subStatus.textContent = 'upcoming';
+      subStatus.classList.remove('live');
+      subtitleBox.classList.remove('active');
+    } else {
+      subtitleBox.innerHTML = '<span class="sub-placeholder">Subtitles will appear here during playback…</span>';
+      subStatus.textContent = 'waiting';
       subStatus.classList.remove('live');
       subtitleBox.classList.remove('active');
     }
@@ -818,20 +1054,18 @@ function updateSubtitleDisplay(currentTime) {
 
 function highlightCurrentWord(text, currentTime) {
   if (!wordTimings.length) return text;
-  
-  // Find which word is currently being spoken
+
   const currentWord = wordTimings.find(w => 
     currentTime >= w.start && currentTime <= w.end
   );
-  
+
   if (!currentWord) return text;
-  
-  // Split text and highlight current word
+
   const words = text.split(/(\s+)/);
   return words.map(word => {
     const cleanWord = word.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
     const targetClean = currentWord.word.toLowerCase().replace(/[^a-z0-9]/g, '');
-    
+
     if (cleanWord === targetClean && currentTime >= currentWord.start && currentTime <= currentWord.end) {
       return `<span class="sub-word current">${word}</span>`;
     }
@@ -839,19 +1073,21 @@ function highlightCurrentWord(text, currentTime) {
   }).join('');
 }
 
-// ── Progress ───────────────────────────────────────────
 function startProgress() {
   if (progressTimer) clearInterval(progressTimer);
 
   progressTimer = setInterval(() => {
     if (!player) return;
 
-    const cur = player.getCurrentTime();
-    const dur = player.getDuration();
+    try {
+      const cur = player.getCurrentTime();
+      const dur = player.getDuration();
 
-    if (dur > 0) {
-      document.getElementById('progressFill').style.width = (cur / dur * 100) + '%';
-      document.getElementById('timeDisplay').textContent = formatTime(cur);
+      if (dur > 0) {
+        document.getElementById('progressFill').style.width = (cur / dur * 100) + '%';
+        document.getElementById('timeDisplay').textContent = formatTime(cur);
+      }
+    } catch (e) {
     }
   }, 500);
 }
@@ -866,7 +1102,6 @@ function formatTime(seconds) {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// ── UI Helpers ─────────────────────────────────────────
 function setStatus(msg) {
   document.getElementById('statusText').textContent = msg;
   document.getElementById('statusBar').classList.add('visible');
@@ -879,11 +1114,18 @@ function hideStatus() {
 function showError(msg) {
   document.getElementById('errorText').textContent = msg;
   document.getElementById('errorBar').classList.add('visible');
+  setTimeout(hideError, 5000);
 }
 
 function hideError() {
   document.getElementById('errorBar').classList.remove('visible');
 }
+
+document.getElementById('searchInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+
+debugLog('PronounceIt initialized');
 </script>
 
   </div>
