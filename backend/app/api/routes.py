@@ -51,7 +51,7 @@ async def search(q: str, accent: str = "us"):
         videos = await youtube_service.search_videos(query, accent, max_results=10)
         
         if not videos:
-            return {"error": "No videos found"}
+            return {"error": "No videos found. Please try a different search term."}
         
         occurrences = []
         
@@ -78,13 +78,13 @@ async def search(q: str, accent: str = "us"):
                     })
         
         if not occurrences:
-            return {"error": "No match found in any transcripts"}
+            return {"error": f"No matches found for '{query}'. Try a different word or phrase."}
         
         return {"results": occurrences}
     
     except Exception as e:
         logger.error(f"Search error: {e}")
-        return {"error": str(e)}
+        return {"error": f"Search failed: {str(e)}. Please try again later."}
 
 
 @router.post("/translate")
