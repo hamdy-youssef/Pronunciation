@@ -597,31 +597,18 @@
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
-// Configuration
-const CONFIG = {
-  API_KEY: 'AIzaSyDGM1AMLvdPGn3fRw79pGMSRVuHfaHjEWc', // Will fallback to invidious if quota hit
-  MAX_RESULTS: 20,
-  PRELOAD_COUNT: 5, // How many videos to check transcripts for
-  INVIDIOUS_INSTANCES: [
-    'https://iv.datura.network',
-    'https://iv.nboeck.de',
-    'https://iv.melmac.space'
-  ]
-};
+const API_BASE = 'http://localhost:8000';
 
-// State
 let state = {
   accent: 'us',
   query: '',
-  videos: [],
-  occurrences: [], // All found instances of the word
+  occurrences: [],
   currentIndex: 0,
   player: null,
   isPlaying: false,
   isSearching: false
 };
 
-// Initialize YouTube Player
 function onYouTubeIframeAPIReady() {
   state.player = new YT.Player('youtubePlayer', {
     height: '100%',
@@ -662,7 +649,6 @@ async function startSearch() {
   state.occurrences = [];
   state.currentIndex = 0;
   
-  // UI Reset
   document.getElementById('playerSection').classList.remove('active');
   document.getElementById('errorMsg').classList.remove('active');
   document.getElementById('infoMsg').classList.remove('active');
@@ -670,59 +656,22 @@ async function startSearch() {
   document.getElementById('searchBtn').disabled = true;
   document.getElementById('occurrenceList').innerHTML = '';
   
-  updateProgress(0, CONFIG.PRELOAD_COUNT, 'Searching for videos...');
+  updateProgress(0, 1, 'Searching transcripts...');
   
   try {
-    // 1. Get video list from YouTube or Invidious
-    let videos = await fetchVideos(query, state.accent);
+    const response = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}&accent=${state.accent}`);
+    const data = await response.json();
     
-    if (!videos.length) {
-      throw new Error('No videos found. Try a different search term.');
+    if (data.error) {
+      throw new Error(data.error);
     }
     
-    // Limit to first few videos for speed
-    videos = videos.slice(0, CONFIG.PRELOAD_COUNT);
-    state.videos = videos;
-    
-    // 2. Scan transcripts
-    updateProgress(0, videos.length, 'Scanning video transcripts...');
-    
-    for (let i = 0; i < videos.length; i++) {
-      const video = videos[i];
-      updateProgress(i, videos.length, `Checking: ${video.title.substring(0, 40)}...`);
-      
-      try {
-        const transcript = await fetchTranscript(video.id);
-        if (transcript && transcript.length) {
-          // Search for word in transcript
-          const matches = findInTranscript(transcript, state.query);
-          
-          matches.forEach(match => {
-            state.occurrences.push({
-              video: video,
-              ...match
-            });
-          });
-        }
-      } catch (e) {
-        console.error(`Failed to get transcript for ${video.id}:`, e);
-      }
-      
-      updateProgress(i + 1, videos.length, `Scanned ${i + 1} of ${videos.length} videos...`);
-    }
+    state.occurrences = data.results || [];
     
     if (state.occurrences.length === 0) {
-      throw new Error(`Found ${videos.length} videos, but none contain "${query}" in their transcripts. The word might not be captioned, or try a longer phrase.`);
+      throw new Error('No match found in any transcripts. Try a different word or phrase.');
     }
     
-    // Sort by relevance (exact matches first)
-    state.occurrences.sort((a, b) => {
-      const aExact = a.text.toLowerCase().includes(` ${state.query} `) ? 1 : 0;
-      const bExact = b.text.toLowerCase().includes(` ${state.query} `) ? 1 : 0;
-      return bExact - aExact;
-    });
-    
-    // Show player
     document.getElementById('progressContainer').classList.remove('active');
     document.getElementById('playerSection').classList.add('active');
     document.getElementById('searchBtn').disabled = false;
@@ -739,192 +688,33 @@ async function startSearch() {
   }
 }
 
-async function fetchVideos(query, accent) {
-  const accentQuery = accent === 'us' ? 'american pronunciation' : 
-                      accent === 'uk' ? 'british pronunciation bbc' : 
-                      'australian pronunciation';
-  
-  const fullQuery = `${query} ${accentQuery} interview podcast`;
-  
-  try {
-    // Try YouTube API first
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${CONFIG.MAX_RESULTS}&q=${encodeURIComponent(fullQuery)}&relevanceLanguage=en&key=${CONFIG.API_KEY}`;
-    
-    const res = await fetch(url);
-    const data = await res.json();
-    
-    if (data.error) {
-      if (data.error.code === 403 || data.error.message.includes('quota')) {
-        console.log('Quota exceeded, trying Invidious...');
-        return fetchInvidiousVideos(fullQuery);
-      }
-      throw new Error(data.error.message);
-    }
-    
-    return data.items.map(item => ({
-      id: item.id.videoId,
-      title: item.snippet.title,
-      channel: item.snippet.channelTitle
-    }));
-    
-  } catch (e) {
-    console.log('YouTube API failed, trying Invidious...');
-    return fetchInvidiousVideos(fullQuery);
-  }
-}
-
-async function fetchInvidiousVideos(query) {
-  for (const instance of CONFIG.INVIDIOUS_INSTANCES) {
-    try {
-      const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
-      const res = await fetch(url, { timeout: 5000 });
-      if (!res.ok) continue;
-      
-      const data = await res.json();
-      return data.slice(0, CONFIG.MAX_RESULTS).map(item => ({
-        id: item.videoId,
-        title: item.title,
-        channel: item.author
-      }));
-    } catch (e) {
-      continue;
-    }
-  }
-  throw new Error('All video sources failed');
-}
-
-async function fetchTranscript(videoId) {
-  // Try multiple caption sources
-  const sources = [
-    // Auto-generated English
-    `https://www.youtube.com/api/timedtext?lang=en&v=${videoId}&fmt=json3&kind=asr`,
-    // Manual English captions
-    `https://www.youtube.com/api/timedtext?lang=en&v=${videoId}&fmt=json3`,
-    `https://www.youtube.com/api/timedtext?lang=en-US&v=${videoId}&fmt=json3`,
-    `https://www.youtube.com/api/timedtext?lang=en-GB&v=${videoId}&fmt=json3`
-  ];
-  
-  for (const url of sources) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) continue;
-      
-      const text = await res.text();
-      if (!text || text === '{}') continue;
-      
-      const data = JSON.parse(text);
-      if (data.events && data.events.length > 0) {
-        return parseTranscript(data.events);
-      }
-    } catch (e) {
-      continue;
-    }
-  }
-  
-  // Fallback to XML format (srv3)
-  try {
-    const res = await fetch(`https://www.youtube.com/api/timedtext?lang=en&v=${videoId}&fmt=srv3`);
-    if (res.ok) {
-      const xml = await res.text();
-      return parseSrv3(xml);
-    }
-  } catch (e) {}
-  
-  return null;
-}
-
-function parseTranscript(events) {
-  const captions = [];
-  
-  events.forEach(event => {
-    if (!event.segs) return;
-    
-    const text = event.segs.map(seg => seg.utf8 || '').join('');
-    if (!text.trim()) return;
-    
-    captions.push({
-      start: (event.tStartMs || 0) / 1000,
-      duration: (event.dDurationMs || 3000) / 1000,
-      text: text.replace(/\n/g, ' ').trim()
-    });
-  });
-  
-  return captions;
-}
-
-function parseSrv3(xml) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xml, 'text/xml');
-  const paragraphs = doc.querySelectorAll('p');
-  
-  return Array.from(paragraphs).map(p => ({
-    start: parseInt(p.getAttribute('t') || 0) / 1000,
-    duration: parseInt(p.getAttribute('d') || 3000) / 1000,
-    text: p.textContent.replace(/\n/g, ' ').trim()
-  })).filter(c => c.text);
-}
-
-function findInTranscript(transcript, query) {
-  const matches = [];
-  const queryLower = query.toLowerCase();
-  
-  transcript.forEach((cap, index) => {
-    const textLower = cap.text.toLowerCase();
-    
-    // Check for exact match or word boundary match
-    if (textLower.includes(queryLower)) {
-      // Get context (previous and next captions)
-      const prev = index > 0 ? transcript[index - 1].text : '';
-      const next = index < transcript.length - 1 ? transcript[index + 1].text : '';
-      
-      matches.push({
-        start: cap.start,
-        text: cap.text,
-        contextBefore: prev,
-        contextAfter: next,
-        index: index
-      });
-    }
-  });
-  
-  return matches;
-}
-
 function loadOccurrence(index) {
   if (index < 0 || index >= state.occurrences.length) return;
   
   state.currentIndex = index;
   const occ = state.occurrences[index];
   
-  // Update player
   if (state.player && state.player.loadVideoById) {
-    // Start 1 second before the word
-    const startTime = Math.max(0, occ.start - 1);
+    const startTime = Math.max(0, occ.timestamp - 1);
     state.player.loadVideoById({
-      videoId: occ.video.id,
+      videoId: occ.videoId,
       startSeconds: startTime
     });
   }
   
-  // Update UI
-  document.getElementById('videoTitle').textContent = occ.video.title;
-  document.getElementById('videoMeta').textContent = `${occ.video.channel} • Match ${index + 1} of ${state.occurrences.length}`;
-  document.getElementById('currentTime').textContent = formatTime(occ.start);
+  document.getElementById('videoTitle').textContent = occ.video_title || 'Loading...';
+  document.getElementById('videoMeta').textContent = `${occ.video_channel || 'Unknown'} • Match ${index + 1} of ${state.occurrences.length}`;
+  document.getElementById('currentTime').textContent = formatTime(occ.timestamp);
   
-  // Update subtitle display with context
-  const before = occ.contextBefore ? `<span class="context">${escapeHtml(occ.contextBefore)} </span>` : '';
-  const current = `<span class="highlight">${escapeHtml(occ.text)}</span>`;
-  const after = occ.contextAfter ? ` <span class="context">${escapeHtml(occ.contextAfter)}</span>` : '';
+  const regex = new RegExp(`(${escapeRegex(state.query)})`, 'gi');
+  const highlighted = escapeHtml(occ.sentence).replace(regex, '<span class="highlight">$1</span>');
+  document.getElementById('subtitleDisplay').innerHTML = highlighted;
   
-  document.getElementById('subtitleDisplay').innerHTML = before + current + after;
-  
-  // Update occurrence list active state
   document.querySelectorAll('.occurrence-item').forEach((el, i) => {
     el.classList.toggle('active', i === index);
     if (i === index) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
   
-  // Update nav buttons
   document.getElementById('prevBtn').disabled = index === 0;
   document.getElementById('nextBtn').disabled = index === state.occurrences.length - 1;
 }
@@ -938,13 +728,12 @@ function renderOccurrenceList() {
     item.className = 'occurrence-item';
     if (index === 0) item.classList.add('active');
     
-    // Highlight the matched word in the text snippet
     const regex = new RegExp(`(${escapeRegex(state.query)})`, 'gi');
-    const highlightedText = escapeHtml(occ.text).replace(regex, '<span class="match">$1</span>');
+    const highlightedText = escapeHtml(occ.sentence).replace(regex, '<span class="match">$1</span>');
     
     item.innerHTML = `
       <div class="occurrence-text">${highlightedText}</div>
-      <div class="occurrence-meta">${formatTime(occ.start)} • ${occ.video.channel}</div>
+      <div class="occurrence-meta">${formatTime(occ.timestamp)} • ${occ.video_channel || 'Unknown'}</div>
     `;
     
     item.onclick = () => loadOccurrence(index);
@@ -977,7 +766,7 @@ function togglePlay() {
 function updateProgress(current, total, text) {
   document.getElementById('progressStatus').textContent = text;
   document.getElementById('progressCount').textContent = `${current}/${total}`;
-  document.getElementById('progressFill').style.width = `${(current / total) * 100}%`;
+  document.getElementById('progressFill').style.width = `${total > 0 ? (current / total) * 100 : 0}%`;
 }
 
 function showError(text) {
@@ -1001,9 +790,26 @@ function escapeRegex(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Enter key to search
 document.getElementById('searchInput').addEventListener('keypress', (e) => {
   if (e.key === 'Enter') startSearch();
+});
+
+document.getElementById('searchInput').addEventListener('input', async (e) => {
+  const text = e.target.value.trim();
+  if (text.length >= 2) {
+    try {
+      const response = await fetch(`${API_BASE}/translate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text, target_lang: state.accent === 'us' || state.accent === 'uk' ? 'ar' : 'en' })
+      });
+      const data = await response.json();
+      if (data.translated && data.translated !== text) {
+        document.getElementById('infoText').textContent = data.translated;
+        document.getElementById('infoMsg').classList.add('active');
+      }
+    } catch (err) {}
+  }
 });
 </script>
 
