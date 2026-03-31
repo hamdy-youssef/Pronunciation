@@ -654,35 +654,22 @@ async function doSearch() {
   }
 }
 
+// Ensure this part of your code is actually receiving data
 async function findAndPlayWord(word) {
-  for (let i = 0; i < videos.length; i++) {
-    const video = videos[i];
-    const videoId = video.id.videoId;
+  // ... after you get your transcript JSON from an external API ...
+  if (match) {
+    currentIndex = i;
+    // CRITICAL: Use seekTo immediately after loading
+    player.loadVideoById({
+      videoId: videoId,
+      startSeconds: Math.floor(match.start) // Jump directly to the word
+    });
     
-    setStatus(`Checking video ${i + 1}/${videos.length} for word timing...`);
-    
-    // Fetch transcript for this video
-    const transcript = await fetchTranscript(videoId);
-    
-    if (transcript && transcript.length > 0) {
-      // Find the word in transcript
-      const wordLower = word.toLowerCase();
-      const match = transcript.find(item => 
-        item.text.toLowerCase().includes(wordLower)
-      );
-      
-      if (match) {
-        // Found the word, play from this timestamp
-        currentIndex = i;
-        currentTranscript = transcript;
-        playVideoAtTime(i, match.start);
-        
-        // Build word timings for highlighting
-        buildWordTimings(transcript);
-        return;
-      }
-    }
+    // Force the subtitles to update
+    currentTranscript = transcript;
+    buildWordTimings(transcript);
   }
+}
   
   // If no specific match found, play first video from start
   playVideo(0);
