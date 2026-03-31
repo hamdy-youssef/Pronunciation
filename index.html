@@ -419,7 +419,7 @@
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
-const API_KEY = 'AIzaSyDGM1AMLvdPGn3fRw79pGMSRVuHfaHjEWc';
+const API_KEY = '';
 
 let videos = [];
 let currentIndex = 0;
@@ -487,9 +487,65 @@ function onPlayerError(e) {
   setTimeout(() => nextVideo(), 1500);
 }
 
+async function searchYouTube(query) {
+  const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+  
+  const proxies = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(searchUrl)}`,
+    `https://corsproxy.io/?${encodeURIComponent(searchUrl)}`
+  ];
+  
+  for (const proxyUrl of proxies) {
+    try {
+      const response = await fetch(proxyUrl);
+      if (!response.ok) continue;
+      
+      const html = await response.text();
+      
+      const videoIds = [];
+      const regex = /"videoId":"([a-zA-Z0-9_-]{11})"/g;
+      let match;
+      while ((match = regex.exec(html)) !== null) {
+        if (!videoIds.includes(match[1])) {
+          videoIds.push(match[1]);
+        }
+      }
+      
+      if (videoIds.length > 0) {
+        const titleRegex = /"title":{"runs":\[{"text":"([^"]+)"}\]/g;
+        const channelRegex = /"shortBylineText":{"runs":\[{"text":"([^"]+)"}\]/g;
+        
+        const results = [];
+        for (let i = 0; i < Math.min(videoIds.length, 50); i++) {
+          const titleMatch = titleRegex.exec(html);
+          const channelMatch = channelRegex.exec(html);
+          
+          results.push({
+            id: { videoId: videoIds[i] },
+            snippet: {
+              title: titleMatch ? titleMatch[1] : `Video ${i + 1}`,
+              channelTitle: channelMatch ? channelMatch[1] : 'Unknown',
+              thumbnails: { medium: { url: `https://img.youtube.com/vi/${videoIds[i]}/mqdefault.jpg` } }
+            }
+          });
+          
+          titleRegex.lastIndex = 0;
+          channelRegex.lastIndex = 0;
+        }
+        
+        return results;
+      }
+    } catch (e) {
+      console.log('Proxy failed:', e.message);
+      continue;
+    }
+  }
+  
+  return [];
+}
+
 function getCORSProxy(url) {
-  const encoded = encodeURIComponent(url);
-  return `https://api.allorigins.win/raw?url=${encoded}`;
+  return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
 }
 
 async function fetchTranscript(videoId) {
@@ -596,46 +652,18 @@ async function doSearch() {
   setStatus(`Searching YouTube for "${q}"...`);
 
   try {
-    const searchRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=50&q=${encodeURIComponent(q)}&key=${API_KEY}`
-    );
-
-    const searchData = await searchRes.json();
-
-    if (searchData.error) {
-      throw new Error(searchData.error.message);
-    }
-
-    let rawVideos = (searchData.items || []).filter(v => v.id?.videoId);
+    const rawVideos = await searchYouTube(q);
 
     if (!rawVideos.length) {
       showError("No results found. Try a different word.");
       return;
     }
 
-    const ids = rawVideos.map(v => v.id.videoId).join(',');
-    const videoRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=status,contentDetails,snippet&id=${ids}&key=${API_KEY}`
-    );
-
-    const videoData = await videoRes.json();
-
-    const embeddableVideos = videoData.items.filter(v => 
-      v.status?.embeddable && 
-      v.status?.uploadStatus !== 'rejected' &&
-      v.status?.privacyStatus !== 'private'
-    );
-
-    videos = rawVideos.filter(v => 
-      embeddableVideos.some(ev => ev.id === v.id.videoId)
-    ).map(v => {
-      const details = embeddableVideos.find(ev => ev.id === v.id.videoId);
-      return {
-        ...v,
-        duration: details?.contentDetails?.duration || 'PT0M0S',
-        fullDetails: details
-      };
-    });
+    videos = rawVideos.map(v => ({
+      ...v,
+      duration: 'PT0M0S',
+      fullDetails: null
+    }));
 
     displayVideosList();
     setStatus(`Found ${videos.length} videos. Looking for "${q}" in transcripts...`);
