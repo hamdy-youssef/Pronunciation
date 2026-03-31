@@ -1,5 +1,6 @@
 import logging
 import re
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +93,7 @@ class TranslationService:
 
         return normalized
 
-    async def translate(self, text: str, target_lang: str | None = None) -> dict:
+    async def translate(self, text: str, target_lang: Optional[str] = None) -> dict:
         detected = self.detect_language(text)
 
         if not target_lang:

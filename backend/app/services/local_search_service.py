@@ -3,6 +3,7 @@ import logging
 import os
 import re
 from difflib import SequenceMatcher
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +49,11 @@ class LocalSearchService:
                     'videoTitle': video.get('title', ''),
                     'channel': video.get('channel', ''),
                     'text': text,
+                    'subtitle_text': text,
                     'clean_text': self._normalize(text),
                     'timestamp': start,
                     'duration': duration,
+                    'caption_index': index,
                 })
 
         return entries
@@ -111,6 +114,7 @@ class LocalSearchService:
                 'timestamp': entry['timestamp'],
                 'duration': entry['duration'],
                 'sentence': entry['text'],
+                'subtitleText': entry['subtitle_text'],
                 'video_title': entry['videoTitle'],
                 'video_channel': entry['channel'],
                 'score': score,
@@ -119,9 +123,102 @@ class LocalSearchService:
         ranked.sort(key=lambda item: (-item['score'], item['timestamp']))
         return ranked[:max_results]
 
-    def search_best(self, query: str, accent: str = 'us') -> dict | None:
+    def search_best(self, query: str, accent: str = 'us') -> Optional[dict]:
         results = self.search(query, accent=accent, max_results=1)
-        return results[0] if results else None
+        if not results:
+            return None
+
+        best = results[0]
+        best['context'] = self.get_context(best['videoId'], best['timestamp'])
+        best['subtitleCues'] = best['context']
+        best['subtitleTranscript'] = self.get_transcript_text(best['videoId'])
+        return best
+
+    def get_context(self, video_id: str, timestamp: float, window: int = 2) -> list:
+        matched = [entry for entry in self.entries if entry.get('videoId') == video_id]
+        matched.sort(key=lambda item: item.get('timestamp', 0))
+
+        if not matched:
+            return []
+
+        closest_index = 0
+        closest_delta = abs(matched[0].get('timestamp', 0) - timestamp)
+
+        for index, entry in enumerate(matched):
+            delta = abs(entry.get('timestamp', 0) - timestamp)
+            if delta < closest_delta:
+                closest_delta = delta
+                closest_index = index
+
+        start = max(0, closest_index - max(0, int(window)))
+        end = min(len(matched), closest_index + max(0, int(window)) + 1)
+
+        context = [
+            {
+                'videoId': item['videoId'],
+                'timestamp': item['timestamp'],
+                'duration': item['duration'],
+                'sentence': item['text'],
+                'subtitleText': item['subtitle_text'],
+                'video_title': item['videoTitle'],
+                'video_channel': item['channel'],
+            }
+            for item in matched[start:end]
+        ]
+
+        for item in context:
+            item['isMatch'] = abs(item['timestamp'] - timestamp) < 0.001
+
+        return context
+
+    def get_transcript(self, video_id: str) -> Optional[dict]:
+        transcript = next((video for video in self.transcripts if video.get('videoId') == video_id), None)
+        if not transcript:
+            return None
+
+        captions = sorted(transcript.get('captions', []), key=lambda item: item.get('start', 0))
+        cleaned_captions = []
+
+        for index, cap in enumerate(captions):
+            text = (cap.get('text') or '').strip()
+            if not text or NOISE_PATTERNS.search(text):
+                continue
+
+            start = float(cap.get('start', 0) or 0)
+            next_start = float(captions[index + 1].get('start', start + 3.5) or (start + 3.5)) if index + 1 < len(captions) else start + 3.5
+            duration = max(1.0, round(next_start - start, 2))
+
+            cleaned_captions.append({
+                'videoId': transcript.get('videoId'),
+                'timestamp': start,
+                'duration': duration,
+                'sentence': text,
+                'subtitleText': text,
+                'video_title': transcript.get('title', ''),
+                'video_channel': transcript.get('channel', ''),
+            })
+
+        return {
+            'videoId': transcript.get('videoId'),
+            'title': transcript.get('title', ''),
+            'channel': transcript.get('channel', ''),
+            'captionCount': len(cleaned_captions),
+            'subtitleTranscript': ' '.join(item['sentence'] for item in cleaned_captions),
+            'captions': cleaned_captions,
+        }
+
+    def get_transcript_text(self, video_id: str) -> str:
+        transcript = self.get_transcript(video_id)
+        if not transcript:
+            return ''
+        return transcript.get('subtitleTranscript', '')
+
+    def get_stats(self) -> dict:
+        return {
+            'videos': len(self.transcripts),
+            'captions': len(self.entries),
+            'uniqueWords': len(self.get_all_words()),
+        }
 
     def get_all_words(self) -> list:
         words = set()

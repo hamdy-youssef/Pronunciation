@@ -401,6 +401,13 @@
     flex-wrap: wrap;
   }
 
+  .player-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
   .play-btn,
   .icon-btn {
     width: 44px;
@@ -422,6 +429,14 @@
     background: linear-gradient(135deg, var(--accent), #ff7a45);
     border-color: transparent;
     color: #fff;
+  }
+
+  .nav-btn {
+    padding: 0 14px;
+    min-width: 44px;
+    width: auto;
+    font-size: 0.92rem;
+    font-family: 'Inter', sans-serif;
   }
 
   .player-copy {
@@ -678,7 +693,14 @@
       <div class="panel video-card">
         <div class="video-frame"><div id="youtubePlayer"></div></div>
         <div class="player-bar">
-          <button class="play-btn" id="playPauseBtn" type="button" onclick="togglePlay()">▶</button>
+          <div class="player-controls">
+            <button class="icon-btn nav-btn" type="button" onclick="prevCue()" title="Previous subtitle">←</button>
+            <button class="play-btn" id="playPauseBtn" type="button" onclick="togglePlay()">▶</button>
+            <button class="icon-btn nav-btn" type="button" onclick="nextCue()" title="Next subtitle">→</button>
+            <button class="icon-btn nav-btn" type="button" onclick="replayClip()" title="Replay moment">↺</button>
+            <button class="icon-btn nav-btn" type="button" onclick="skipTime(-5)" title="Back 5 seconds">-5</button>
+            <button class="icon-btn nav-btn" type="button" onclick="skipTime(5)" title="Forward 5 seconds">+5</button>
+          </div>
           <div class="player-copy">
             <div class="clip-title" id="clipTitle">Waiting for a match...</div>
             <div class="clip-meta" id="clipMeta">Search a phrase to jump to the exact spoken moment.</div>
@@ -705,12 +727,6 @@
             <div class="stat"><span class="label">Timestamp</span><span class="value" id="resultTimestamp">0:00</span></div>
             <div class="stat"><span class="label">Score</span><span class="value" id="resultScore">0</span></div>
           </div>
-
-          <div class="result-actions">
-            <button class="ghost-btn" type="button" onclick="replayClip()">Replay moment</button>
-            <button class="ghost-btn" type="button" onclick="skipTime(-5)">-5 seconds</button>
-            <button class="ghost-btn" type="button" onclick="skipTime(5)">+5 seconds</button>
-          </div>
         </div>
       </aside>
     </section>
@@ -723,13 +739,15 @@
 
   <script src="https://www.youtube.com/iframe_api"></script>
   <script>
-    const API_BASE = window.location.origin && window.location.origin !== 'null'
+    const API_BASE = window.location.port === '8000'
       ? window.location.origin
       : 'http://localhost:8000';
     const state = {
       query: '',
       queryTokens: [],
       result: null,
+      cues: [],
+      currentCueIndex: 0,
       player: null,
       playerReady: false,
       isPlaying: false,
@@ -738,6 +756,7 @@
       translateSeq: 0,
       pendingPlay: false,
       playTicker: null,
+      pendingSeek: null,
     };
 
     function showAlert(id, message) {
@@ -825,6 +844,19 @@
           onStateChange: (event) => {
             state.isPlaying = event.data === YT.PlayerState.PLAYING;
             document.getElementById('playPauseBtn').textContent = state.isPlaying ? '⏸' : '▶';
+
+            if (state.pendingSeek !== null && state.player && typeof state.player.seekTo === 'function') {
+              state.player.seekTo(state.pendingSeek, true);
+              state.pendingSeek = null;
+            }
+
+            if (event.data === YT.PlayerState.PLAYING && state.result) {
+              const start = Number(state.result.timestamp || 0);
+              const current = Number(state.player.getCurrentTime ? state.player.getCurrentTime() : 0);
+              if (current < start - 0.25 || current > start + Number(state.result.duration || 3.5) + 0.5) {
+                state.player.seekTo(start, true);
+              }
+            }
           },
         },
       });
@@ -847,21 +879,37 @@
 
       document.getElementById('currentTime').textContent = formatTime(currentTime);
 
-      const words = getSubtitleWords(state.result.sentence);
-      if (!words.length) return;
+      const cueIndex = getCueIndexAtTime(currentTime);
+      if (cueIndex !== state.currentCueIndex) {
+        state.currentCueIndex = cueIndex;
+      }
 
-      const start = Number(state.result.timestamp || 0);
-      const duration = Math.max(1, Number(state.result.duration || 3.5));
-      const elapsed = Math.max(0, Math.min(duration, currentTime - start));
-      const activeIndex = Math.min(words.length - 1, Math.floor((elapsed / duration) * words.length));
-      renderSubtitle(state.result.sentence, activeIndex, state.queryTokens);
+      const cue = state.cues[state.currentCueIndex] || state.result;
+      const elapsed = Math.max(0, currentTime - Number(cue.timestamp || 0));
+      renderSubtitle(cue.sentence || cue.text || '', elapsed, cue.duration || state.result.duration || 3.5, state.queryTokens);
     }
 
     function getSubtitleWords(sentence) {
       return (sentence || '').match(/\b[\p{L}\p{N}'’-]+\b/gu) || [];
     }
 
-    function renderSubtitle(sentence, activeIndex, queryTokens) {
+    function getCueIndexAtTime(currentTime) {
+      if (!state.cues.length) return 0;
+
+      let index = 0;
+      for (let i = 0; i < state.cues.length; i += 1) {
+        const cue = state.cues[i];
+        const start = Number(cue.timestamp || 0);
+        const next = i + 1 < state.cues.length ? Number(state.cues[i + 1].timestamp || start + Number(cue.duration || 3.5)) : start + Number(cue.duration || 3.5);
+        if (currentTime >= start - 0.15 && currentTime < next - 0.15) {
+          return i;
+        }
+        if (currentTime >= start) index = i;
+      }
+      return index;
+    }
+
+    function renderSubtitle(sentence, elapsedSeconds, cueDuration, queryTokens) {
       const words = getSubtitleWords(sentence);
       if (!words.length) {
         document.getElementById('subtitleDisplay').textContent = sentence || 'No subtitle available.';
@@ -869,6 +917,8 @@
       }
 
       const querySet = new Set(queryTokens);
+      const duration = Math.max(1, Number(cueDuration || 3.5));
+      const activeIndex = Math.min(words.length - 1, Math.floor((Math.max(0, Math.min(duration, elapsedSeconds)) / duration) * words.length));
       let index = 0;
       const markup = (sentence || '')
         .split(/(\s+)/)
@@ -888,6 +938,45 @@
         .join('');
 
       document.getElementById('subtitleDisplay').innerHTML = markup;
+    }
+
+    function setCueIndex(index, play = true) {
+      if (!state.cues.length) return;
+      const nextIndex = Math.max(0, Math.min(state.cues.length - 1, index));
+      state.currentCueIndex = nextIndex;
+      const cue = state.cues[nextIndex];
+      if (!cue) return;
+      if (state.player && typeof state.player.seekTo === 'function') {
+        state.player.seekTo(Number(cue.timestamp || 0), true);
+        if (play) state.player.playVideo();
+      }
+      renderSubtitle(cue.sentence || cue.text || '', 0, cue.duration || 3.5, state.queryTokens);
+      document.getElementById('clipMeta').textContent = `${cue.video_channel || state.result.channel || 'Unknown channel'} · ${formatTime(cue.timestamp || 0)}`;
+    }
+
+    function findCueIndex(timestamp) {
+      if (!state.cues.length) return 0;
+
+      let bestIndex = 0;
+      let bestDelta = Infinity;
+      for (let i = 0; i < state.cues.length; i += 1) {
+        const delta = Math.abs(Number(state.cues[i].timestamp || 0) - Number(timestamp || 0));
+        if (delta < bestDelta) {
+          bestDelta = delta;
+          bestIndex = i;
+        }
+      }
+      return bestIndex;
+    }
+
+    function nextCue() {
+      if (!state.cues.length) return;
+      setCueIndex(state.currentCueIndex + 1, true);
+    }
+
+    function prevCue() {
+      if (!state.cues.length) return;
+      setCueIndex(state.currentCueIndex - 1, true);
     }
 
     function updateTranslationLabel(text) {
@@ -948,9 +1037,9 @@
         return;
       }
 
-      if (!/^[a-zA-Z\s]+$/.test(query)) {
+      if (!/^[a-zA-Z\s'’-]+$/.test(query)) {
         input.classList.add('error');
-        showAlert('errorAlert', 'Only English letters and spaces are allowed in search.');
+        showAlert('errorAlert', 'Only letters, spaces, apostrophes, and hyphens are allowed in search.');
         return;
       }
 
@@ -968,11 +1057,25 @@
           return;
         }
 
-        state.result = data;
-        renderResult(data);
+        const result = data.results && Array.isArray(data.results)
+          ? data.results[0]
+          : data;
+
+        if (!result) {
+          showAlert('errorAlert', data.error || 'No match found.');
+          setLoading(false);
+          return;
+        }
+
+        state.result = result;
+        state.cues = Array.isArray(result.subtitleCues) && result.subtitleCues.length
+          ? result.subtitleCues
+          : (Array.isArray(result.context) && result.context.length ? result.context : [result]);
+        state.currentCueIndex = findCueIndex(result.timestamp);
+        renderResult(result);
         document.getElementById('workspace').classList.add('active');
         showAlert('successAlert', `Found one strong match for "${query}".`);
-        playResult(data);
+        playResult(result);
       } catch (err) {
         showAlert('errorAlert', 'Search failed. Check the backend and try again.');
       } finally {
@@ -989,7 +1092,7 @@
       document.getElementById('resultSource').textContent = `${data.videoTitle || 'Unknown video'} · ${data.channel || 'Unknown channel'}`;
       document.getElementById('resultTimestamp').textContent = formatTime(data.timestamp || 0);
       document.getElementById('resultScore').textContent = Math.round(Number(data.score || 0));
-      renderSubtitle(data.sentence || '', 0, state.queryTokens);
+      renderSubtitle(data.subtitleText || data.sentence || '', 0, data.duration || 3.5, state.queryTokens);
       document.getElementById('currentTime').textContent = formatTime(data.timestamp || 0);
     }
 
@@ -1001,16 +1104,32 @@
 
       state.pendingPlay = false;
       const startSeconds = Math.max(0, Number(data.timestamp || 0));
+      const endSeconds = Math.max(startSeconds + 1, startSeconds + Number(data.duration || 3.5));
       try {
-        state.player.loadVideoById({
+        state.player.cueVideoById({
           videoId: data.videoId,
           startSeconds,
+          endSeconds,
         });
-        state.player.playVideo();
+        state.pendingSeek = startSeconds;
+        setTimeout(() => {
+          if (state.player && typeof state.player.seekTo === 'function') {
+            state.player.seekTo(startSeconds, true);
+          }
+          if (state.player && typeof state.player.playVideo === 'function') {
+            state.player.playVideo();
+          }
+        }, 120);
       } catch (err) {
         try {
           state.player.cueVideoById({ videoId: data.videoId, startSeconds });
-          setTimeout(() => state.player.playVideo(), 150);
+          state.pendingSeek = startSeconds;
+          setTimeout(() => {
+            if (state.player && typeof state.player.seekTo === 'function') {
+              state.player.seekTo(startSeconds, true);
+            }
+            state.player.playVideo();
+          }, 150);
         } catch (innerErr) {}
       }
     }
