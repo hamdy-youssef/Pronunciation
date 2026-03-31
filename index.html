@@ -20,7 +20,6 @@
     --uk-color: #47c8ff;
     --danger: #ff6b6b;
     --radius: 12px;
-    --search-word: #ff4757;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -278,69 +277,39 @@
     letter-spacing: 0.15em; color: var(--muted);
     text-transform: uppercase; margin-bottom: 10px;
   }
-  
-  .subtitle-external-box {
+  .subtitle-box {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 20px 24px;
+    border-radius: var(--radius); padding: 20px 24px; min-height: 90px;
     font-family: 'DM Mono', monospace; font-size: 15px;
-    font-weight: 300; color: var(--text);
-    line-height: 1.8; position: relative; transition: border-color 0.3s;
-    max-height: 300px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    word-wrap: break-word;
+    font-weight: 300; font-style: italic; color: var(--text);
+    line-height: 1.7; position: relative; transition: border-color 0.3s;
   }
-  
-  .subtitle-external-box::-webkit-scrollbar {
-    width: 8px;
-  }
-  .subtitle-external-box::-webkit-scrollbar-track {
-    background: var(--surface2);
-    border-radius: 4px;
-  }
-  .subtitle-external-box::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 4px;
-  }
-  .subtitle-external-box::-webkit-scrollbar-thumb:hover {
-    background: var(--muted);
-  }
-  
-  .subtitle-external-box.active { 
-    border-color: rgba(232,255,71,0.3); 
-  }
-  
-  .search-word-highlight {
-    color: var(--search-word);
-    font-weight: 700;
-    text-decoration: underline;
-    text-decoration-color: var(--search-word);
-    text-decoration-thickness: 3px;
-    text-underline-offset: 4px;
-    background: rgba(255, 71, 87, 0.15);
-    padding: 2px 4px;
-    border-radius: 4px;
-  }
-  
-  .current-word-highlight {
+  .subtitle-box.active { border-color: rgba(232,255,71,0.3); }
+  .sub-highlight {
     color: var(--accent);
-    font-weight: 700;
-    background: rgba(232, 255, 71, 0.25);
+    font-style: normal;
+    font-weight: 600;
+    background: rgba(232,255,71,0.15);
+    border-radius: 3px;
     padding: 2px 4px;
-    border-radius: 4px;
-    transition: all 0.15s ease;
+    transition: all 0.2s ease;
   }
-  
+  .sub-word {
+    display: inline-block;
+    margin: 0 2px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+  }
+  .sub-word.current {
+    color: var(--accent);
+    font-weight: 600;
+    background: rgba(232,255,71,0.2);
+    transform: scale(1.05);
+  }
   .sub-placeholder { color: var(--muted); font-style: normal; font-size: 13px; }
-  
-  .subtitle-status-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-  }
-  
   .subtitle-status {
+    position: absolute; top: 12px; right: 16px;
     font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
   }
   .subtitle-status.live {
@@ -371,27 +340,30 @@
   }
   .error-bar.visible { display: flex; }
 
-  .api-toggle {
-    display: flex;
-    gap: 10px;
-    margin-top: 12px;
-    padding: 12px;
+  .debug-panel {
+    display: none;
+    margin-top: 16px;
+    padding: 16px;
     background: var(--surface2);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
     font-family: 'DM Mono', monospace;
     font-size: 12px;
+    max-height: 200px;
+    overflow-y: auto;
   }
-  
-  .api-toggle label {
+  .debug-panel.visible {
+    display: block;
+  }
+  .debug-log {
     color: var(--muted);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
+    margin-bottom: 4px;
   }
-  
-  .api-toggle input[type="radio"] {
-    accent-color: var(--accent);
+  .debug-log.error {
+    color: var(--danger);
+  }
+  .debug-log.success {
+    color: var(--accent);
   }
 
   @keyframes fadeDown {
@@ -431,12 +403,6 @@
       </div>
       <button class="search-btn" id="searchBtn" onclick="doSearch()">Search</button>
     </div>
-    
-    <div class="api-toggle">
-      <label><input type="radio" name="apiSource" value="invidious" checked> Use Invidious (No Limits)</label>
-      <label><input type="radio" name="apiSource" value="youtube"> Use YouTube API</label>
-    </div>
-    
     <div class="accent-row">
       <button class="accent-btn active" data-accent="US" onclick="setAccent('US')">
         <span class="flag">🇺🇸</span> American English
@@ -455,7 +421,7 @@
 
   <div class="status-bar" id="statusBar">
     <div class="spinner"></div>
-    <span id="statusText">Searching...</span>
+    <span id="statusText">Searching YouTube…</span>
   </div>
   <div class="error-bar" id="errorBar">
     <span>⚠</span>
@@ -501,29 +467,24 @@
   </div>
 
   <div class="subtitle-section" id="subtitleSection">
-    <div class="subtitle-status-bar">
-      <div class="subtitle-label">Full Video Transcript</div>
+    <div class="subtitle-label">Subtitles / Captions</div>
+    <div class="subtitle-box" id="subtitleBox">
+      <span class="sub-placeholder">Subtitles will appear here during playback…</span>
       <span class="subtitle-status" id="subStatus">waiting</span>
     </div>
-    <div class="subtitle-external-box" id="subtitleBox">
-      <span class="sub-placeholder">Subtitles will appear here when video starts...</span>
-    </div>
+  </div>
+
+  <div class="debug-panel" id="debugPanel">
+    <div style="color: var(--accent); margin-bottom: 8px; font-weight: 600;">Debug Log</div>
+    <div id="debugLogs"></div>
   </div>
 
 </div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
-// Use Invidious instances (free, no API keys needed)
-const INVIDIOUS_INSTANCES = [
-  'https://vid.puffyan.us',
-  'https://inv.riverside.rocks',
-  'https://invidious.snopyta.org',
-  'https://y.com.sb',
-  'https://invidious.kavin.rocks'
-];
+const API_KEY = 'AIzaSyDGM1AMLvdPGn3fRw79pGMSRVuHfaHjEWc';
 
-let currentInstanceIndex = 0;
 let currentAccent = 'US';
 let videos = [];
 let currentIndex = 0;
@@ -537,26 +498,6 @@ let isPlaying = false;
 let currentTranscript = [];
 let wordTimings = [];
 let currentSearchWord = '';
-let currentMatchTime = 0;
-let useYouTubeAPI = false;
-let YOUTUBE_API_KEY = 'AIzaSyDGM1AMLvdPGn3fRw79pGMSRVuHfaHjEWc';
-
-function getApiSource() {
-  const radios = document.getElementsByName('apiSource');
-  for (let radio of radios) {
-    if (radio.checked) return radio.value;
-  }
-  return 'invidious';
-}
-
-function getCurrentInvidiousInstance() {
-  return INVIDIOUS_INSTANCES[currentInstanceIndex];
-}
-
-function rotateInstance() {
-  currentInstanceIndex = (currentInstanceIndex + 1) % INVIDIOUS_INSTANCES.length;
-  debugLog(`Rotated to Invidious instance: ${getCurrentInvidiousInstance()}`);
-}
 
 function debugLog(message, type = 'info') {
   console.log(`[${type.toUpperCase()}] ${message}`);
@@ -572,13 +513,7 @@ function onYouTubeIframeAPIReady() {
       autoplay: 1, 
       rel: 0,
       enablejsapi: 1,
-      origin: window.location.origin,
-      iv_load_policy: 3,
-      modestbranding: 1,
-      playsinline: 1,
-      controls: 1,
-      disablekb: 0,
-      fs: 1,
+      origin: window.location.origin
     },
     events: {
       onReady: () => { 
@@ -661,69 +596,12 @@ async function translateText() {
   }
 }
 
-async function searchInvidious(query) {
-  const instance = getCurrentInvidiousInstance();
-  const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
-  
-  try {
-    debugLog(`Searching Invidious: ${instance}`);
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Instance failed');
-    const data = await response.json();
-    
-    // Transform Invidious format to match our expected format
-    return data.map(video => ({
-      id: { videoId: video.videoId },
-      snippet: {
-        title: video.title,
-        description: video.description,
-        thumbnails: { medium: { url: video.videoThumbnails?.[0]?.url || '' } }
-      }
-    }));
-  } catch (err) {
-    debugLog(`Invidious instance failed: ${err.message}`, 'error');
-    rotateInstance();
-    if (currentInstanceIndex !== 0) {
-      return searchInvidious(query); // Retry with next instance
-    }
-    throw new Error('All Invidious instances failed');
-  }
-}
-
-async function fetchInvidiousTranscript(videoId) {
-  const instance = getCurrentInvidiousInstance();
-  
-  try {
-    // Try to get captions via Invidious
-    const url = `${instance}/api/v1/captions/${videoId}?label=English`;
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      // Try alternative method via YouTube directly with proxy
-      return await fetchTranscriptAlternative(videoId);
-    }
-    
-    const data = await response.json();
-    if (data.captions && data.captions.length > 0) {
-      // Fetch the actual caption file
-      const captionUrl = data.captions[0].url;
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(captionUrl)}`;
-      const captionRes = await fetch(proxyUrl);
-      const xmlText = await captionRes.text();
-      return parseTranscriptXML(xmlText);
-    }
-    return [];
-  } catch (err) {
-    debugLog(`Invidious transcript failed: ${err.message}`, 'error');
-    return await fetchTranscriptAlternative(videoId);
-  }
-}
-
 async function fetchTranscript(videoId) {
   debugLog(`Fetching transcript for ${videoId}`);
 
   try {
     const captionUrl = `https://www.youtube.com/api/timedtext?type=list&v=${videoId}`;
+
     const proxyUrls = [
       `https://corsproxy.io/?${encodeURIComponent(captionUrl)}`,
       `https://api.allorigins.win/raw?url=${encodeURIComponent(captionUrl)}`
@@ -734,6 +612,8 @@ async function fetchTranscript(videoId) {
         const response = await fetch(proxyUrl);
         if (response.ok) {
           const text = await response.text();
+          debugLog(`Got caption list response, length: ${text.length}`);
+
           if (text.includes('lang_code')) {
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(text, "text/xml");
@@ -754,12 +634,16 @@ async function fetchTranscript(videoId) {
               if (transcriptRes.ok) {
                 const transcriptText = await transcriptRes.text();
                 const parsed = parseTranscriptXML(transcriptText);
-                if (parsed.length > 0) return parsed;
+                if (parsed.length > 0) {
+                  debugLog(`Successfully parsed ${parsed.length} transcript segments`);
+                  return parsed;
+                }
               }
             }
           }
         }
       } catch (e) {
+        debugLog(`Proxy failed: ${e.message}`, 'error');
         continue;
       }
     }
@@ -767,6 +651,7 @@ async function fetchTranscript(videoId) {
     debugLog(`Caption list fetch failed: ${err.message}`, 'error');
   }
 
+  debugLog('All transcript methods failed', 'error');
   return [];
 }
 
@@ -837,23 +722,6 @@ async function fetchTranscriptAlternative(videoId) {
   return [];
 }
 
-async function searchYouTubeAPI(query) {
-  const searchRes = await fetch(
-    `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=50&q=${encodeURIComponent(query)}&key=${YOUTUBE_API_KEY}`
-  );
-
-  const searchData = await searchRes.json();
-
-  if (searchData.error) {
-    if (searchData.error.message.includes('quota')) {
-      throw new Error('QUOTA_EXCEEDED');
-    }
-    throw new Error(searchData.error.message);
-  }
-
-  return searchData.items || [];
-}
-
 async function doSearch() {
   const q = document.getElementById('searchInput').value.trim();
   if (!q) return;
@@ -861,7 +729,6 @@ async function doSearch() {
   currentSearchWord = q.toLowerCase();
   lastWord = q;
   hideError();
-  useYouTubeAPI = getApiSource() === 'youtube';
 
   document.getElementById('translateSection').classList.add('visible');
   document.getElementById('translateText').textContent = '';
@@ -869,43 +736,59 @@ async function doSearch() {
   setStatus("Searching videos...");
   document.getElementById('searchBtn').disabled = true;
 
+  const accentLabel = currentAccent === 'US'
+    ? 'American English pronunciation how to pronounce'
+    : 'British English pronunciation how to pronounce';
+
   try {
-    let rawVideos = [];
-    
-    if (useYouTubeAPI) {
-      // Use YouTube Data API
-      const searchQuery = `"${q}"`;
-      rawVideos = await searchYouTubeAPI(searchQuery);
-      
-      // Filter embeddable videos
-      const ids = rawVideos.map(v => v.id?.videoId).filter(Boolean).join(',');
-      if (ids) {
-        const videoRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/videos?part=status,contentDetails,snippet&id=${ids}&key=${YOUTUBE_API_KEY}`
-        );
-        const videoData = await videoRes.json();
-        
-        const embeddableIds = videoData.items
-          .filter(v => v.status?.embeddable && v.status?.privacyStatus !== 'private')
-          .map(v => v.id);
-          
-        rawVideos = rawVideos.filter(v => embeddableIds.includes(v.id?.videoId));
-      }
-    } else {
-      // Use Invidious (no quota limits)
-      const searchQuery = `"${q}"`;
-      rawVideos = await searchInvidious(searchQuery);
+    const searchRes = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=50&q=${encodeURIComponent(q + " " + accentLabel)}&key=${API_KEY}`
+    );
+
+    const searchData = await searchRes.json();
+
+    if (searchData.error) {
+      throw new Error(searchData.error.message);
     }
 
-    videos = rawVideos.map(v => ({
-      ...v,
-      id: { videoId: v.id?.videoId || v.videoId }
-    })).filter(v => v.id.videoId);
+    let rawVideos = (searchData.items || []).filter(v => v.id?.videoId);
+    debugLog(`Found ${rawVideos.length} raw videos`);
 
-    debugLog(`Found ${videos.length} videos`);
+    if (!rawVideos.length) {
+      showError("No results found. Try a different word.");
+      return;
+    }
+
+    const ids = rawVideos.map(v => v.id.videoId).join(',');
+
+    const videoRes = await fetch(
+      `https://www.googleapis.com/youtube/v3/videos?part=status,contentDetails,snippet&id=${ids}&key=${API_KEY}`
+    );
+
+    const videoData = await videoRes.json();
+
+    const embeddableVideos = videoData.items.filter(v => {
+      const status = v.status;
+      return status.embeddable && 
+             !status.uploadStatus === 'rejected' &&
+             !status.privacyStatus === 'private';
+    });
+
+    videos = rawVideos.filter(v => 
+      embeddableVideos.some(ev => ev.id === v.id.videoId)
+    ).map(v => {
+      const details = embeddableVideos.find(ev => ev.id === v.id.videoId);
+      return {
+        ...v,
+        duration: details?.contentDetails?.duration || 'PT0M0S',
+        fullDetails: details
+      };
+    });
+
+    debugLog(`Found ${videos.length} embeddable videos`);
 
     if (!videos.length) {
-      showError("No results found. Try a different word.");
+      showError("No playable videos found. Try another word.");
       return;
     }
 
@@ -913,13 +796,7 @@ async function doSearch() {
 
   } catch (err) {
     debugLog(`Search error: ${err.message}`, 'error');
-    if (err.message.includes('QUOTA_EXCEEDED') || err.message.includes('quota')) {
-      showError("YouTube API quota exceeded! Switch to 'Invidious' mode (no limits).");
-      // Auto-switch to invidious
-      document.querySelector('input[value="invidious"]').checked = true;
-    } else {
-      showError("Search failed: " + err.message);
-    }
+    showError("Search failed: " + err.message);
   } finally {
     hideStatus();
     document.getElementById('searchBtn').disabled = false;
@@ -928,9 +805,9 @@ async function doSearch() {
 
 async function findAndPlayWord(word) {
   const wordLower = word.toLowerCase().trim();
-  debugLog(`Searching for word: "${wordLower}" in ALL ${videos.length} videos`);
+  debugLog(`Searching for word: "${wordLower}"`);
 
-  const videosToCheck = videos;
+  const videosToCheck = videos.slice(0, 15);
 
   for (let i = 0; i < videosToCheck.length; i++) {
     const video = videosToCheck[i];
@@ -938,84 +815,58 @@ async function findAndPlayWord(word) {
 
     setStatus(`Checking video ${i + 1}/${videosToCheck.length} for "${word}"...`);
 
-    let transcript = [];
-    
-    if (useYouTubeAPI) {
-      transcript = await fetchTranscript(videoId);
-      if (!transcript.length) transcript = await fetchTranscriptAlternative(videoId);
-    } else {
-      transcript = await fetchInvidiousTranscript(videoId);
+    let transcript = await fetchTranscript(videoId);
+
+    if (!transcript.length) {
+      transcript = await fetchTranscriptAlternative(videoId);
     }
 
     if (transcript && transcript.length > 0) {
       debugLog(`Video ${i + 1}: Got ${transcript.length} transcript segments`);
 
       let match = null;
-      let matchTime = 0;
 
-      for (let j = 0; j < transcript.length; j++) {
-        const segment = transcript[j];
-        const words = segment.text.toLowerCase().match(/[a-z]+/g) || [];
-        
-        if (words.includes(wordLower)) {
-          match = segment;
-          const segmentWords = segment.text.split(/\s+/);
-          const wordIndex = segmentWords.findIndex(w => 
-            w.toLowerCase().replace(/[^a-z]/g, '') === wordLower
-          );
-          if (wordIndex !== -1) {
-            const durationPerWord = segment.duration / segmentWords.length;
-            matchTime = segment.start + (wordIndex * durationPerWord);
-          } else {
-            matchTime = segment.start;
-          }
-          break;
-        }
-      }
+      match = transcript.find(item => {
+        const words = item.text.toLowerCase().match(/[a-z]+/g) || [];
+        return words.includes(wordLower);
+      });
 
       if (!match) {
-        for (let j = 0; j < transcript.length; j++) {
-          const segment = transcript[j];
-          if (segment.text.toLowerCase().includes(wordLower)) {
-            match = segment;
-            matchTime = segment.start;
-            break;
-          }
-        }
+        match = transcript.find(item => 
+          item.text.toLowerCase().includes(wordLower)
+        );
       }
 
       if (!match && wordLower.length > 3) {
-        for (let j = 0; j < transcript.length; j++) {
-          const segment = transcript[j];
-          const text = segment.text.toLowerCase();
-          if (text.includes(wordLower.slice(0, -1)) ||
-              text.includes(wordLower + 's') ||
-              text.includes(wordLower + 'es') ||
-              text.includes(wordLower + 'ed') ||
-              text.includes(wordLower + 'ing')) {
-            match = segment;
-            matchTime = segment.start;
-            break;
-          }
-        }
+        match = transcript.find(item => {
+          const text = item.text.toLowerCase();
+          return text.includes(wordLower.slice(0, -1)) ||
+                 text.includes(wordLower + 's') ||
+                 text.includes(wordLower + 'es') ||
+                 text.includes(wordLower + 'ed') ||
+                 text.includes(wordLower + 'ing');
+        });
       }
 
       if (match) {
-        debugLog(`Found "${word}" at ${matchTime}s in video ${videoId}`, 'success');
+        debugLog(`Found "${word}" at ${match.start}s in video ${videoId}`, 'success');
 
-        currentIndex = i;
+        currentIndex = videos.indexOf(video);
         currentTranscript = transcript;
-        currentMatchTime = matchTime;
 
-        buildWordTimings(transcript, wordLower);
+        buildWordTimings(transcript);
 
-        playVideoAtTime(currentIndex, matchTime);
+        playVideoAtTime(currentIndex, match.start);
 
-        setStatus(`Found "${word}" at ${formatTime(matchTime)}!`);
+        setStatus(`Found "${word}" at ${formatTime(match.start)}!`);
         setTimeout(hideStatus, 2000);
 
         return;
+      } else {
+        debugLog(`Word "${word}" not found in video ${i + 1} transcript`);
       }
+    } else {
+      debugLog(`No transcript available for video ${i + 1}`);
     }
   }
 
@@ -1024,9 +875,8 @@ async function findAndPlayWord(word) {
   playVideo(0);
 }
 
-function buildWordTimings(transcript, searchWord) {
+function buildWordTimings(transcript) {
   wordTimings = [];
-  const searchWordLower = searchWord.toLowerCase();
 
   transcript.forEach(segment => {
     const words = segment.text.split(/\s+/);
@@ -1034,22 +884,18 @@ function buildWordTimings(transcript, searchWord) {
 
     words.forEach((word, index) => {
       const cleanWord = word.replace(/[^a-zA-Z0-9]/g, '');
-      const cleanWordLower = cleanWord.toLowerCase();
       if (cleanWord) {
         wordTimings.push({
           word: cleanWord,
-          fullWord: word,
           start: segment.start + (index * durationPerWord),
           end: segment.start + ((index + 1) * durationPerWord),
-          isSearchWord: cleanWordLower === searchWordLower || 
-                       cleanWordLower === searchWordLower + 's' ||
-                       cleanWordLower === searchWordLower + 'es' ||
-                       cleanWordLower === searchWordLower + 'ed' ||
-                       cleanWordLower === searchWordLower + 'ing'
+          fullText: word
         });
       }
     });
   });
+
+  debugLog(`Built ${wordTimings.length} word timings`);
 }
 
 function playVideoAtTime(index, startTime) {
@@ -1062,7 +908,7 @@ function playVideoAtTime(index, startTime) {
   document.getElementById('subtitleSection').classList.add('visible');
   document.getElementById('nowTitle').textContent = videos[index].snippet.title;
 
-  debugLog(`Playing video ${vid} at EXACT time ${startTime}s`);
+  debugLog(`Playing video ${vid} at ${startTime}s`);
 
   if (playerReady && player) {
     player.loadVideoById({
@@ -1076,12 +922,13 @@ function playVideoAtTime(index, startTime) {
         player.seekTo(startTime, true);
         player.playVideo();
       }
-    }, 300);
+    }, 500);
   } else {
+    debugLog('Player not ready, retrying...', 'error');
     setTimeout(() => playVideoAtTime(index, startTime), 500);
   }
 
-  displayFullTranscript(startTime);
+  updateSubtitleDisplay(startTime);
 }
 
 function playVideo(index) {
@@ -1110,53 +957,22 @@ async function findAndPlayWordInVideo(index, word) {
 
   setStatus(`Checking next video for "${word}"...`);
 
-  let transcript = [];
-  
-  if (useYouTubeAPI) {
-    transcript = await fetchTranscript(videoId);
-    if (!transcript.length) transcript = await fetchTranscriptAlternative(videoId);
-  } else {
-    transcript = await fetchInvidiousTranscript(videoId);
+  let transcript = await fetchTranscript(videoId);
+  if (!transcript.length) {
+    transcript = await fetchTranscriptAlternative(videoId);
   }
 
   if (transcript.length > 0) {
     currentTranscript = transcript;
-    
+    buildWordTimings(transcript);
+
     const wordLower = word.toLowerCase();
-    let match = null;
-    let matchTime = 0;
-
-    for (let j = 0; j < transcript.length; j++) {
-      const segment = transcript[j];
-      const words = segment.text.toLowerCase().match(/[a-z]+/g) || [];
-      
-      if (words.includes(wordLower)) {
-        match = segment;
-        const segmentWords = segment.text.split(/\s+/);
-        const wordIndex = segmentWords.findIndex(w => 
-          w.toLowerCase().replace(/[^a-z]/g, '') === wordLower
-        );
-        if (wordIndex !== -1) {
-          const durationPerWord = segment.duration / segmentWords.length;
-          matchTime = segment.start + (wordIndex * durationPerWord);
-        } else {
-          matchTime = segment.start;
-        }
-        break;
-      }
-    }
-
-    if (!match) {
-      match = transcript.find(item => 
-        item.text.toLowerCase().includes(wordLower)
-      );
-      if (match) matchTime = match.start;
-    }
-
-    buildWordTimings(transcript, word);
+    const match = transcript.find(item => 
+      item.text.toLowerCase().includes(wordLower)
+    );
 
     if (match) {
-      playVideoAtTime(index, matchTime);
+      playVideoAtTime(index, match.start);
     } else {
       playVideo(index);
     }
@@ -1204,66 +1020,57 @@ function startCaptionSync() {
   }, 100);
 }
 
-function displayFullTranscript(currentTime) {
-  const subtitleBox = document.getElementById('subtitleBox');
-  const subStatus = document.getElementById('subStatus');
-  
-  if (!subtitleBox || !subStatus) return;
-
-  if (!currentTranscript || currentTranscript.length === 0) {
-    subtitleBox.innerHTML = '<span class="sub-placeholder">No transcript available for this video.</span>';
-    return;
-  }
-
-  let fullText = '';
-  const searchWordLower = currentSearchWord.toLowerCase();
-
-  currentTranscript.forEach((segment, index) => {
-    const words = segment.text.split(/\s+/);
-    const segmentWords = words.map((word, wordIndex) => {
-      const cleanWord = word.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-      
-      const isSearchWord = cleanWord === searchWordLower ||
-                          cleanWord === searchWordLower + 's' ||
-                          cleanWord === searchWordLower + 'es' ||
-                          cleanWord === searchWordLower + 'ed' ||
-                          cleanWord === searchWordLower + 'ing';
-      
-      const durationPerWord = segment.duration / words.length;
-      const wordStart = segment.start + (wordIndex * durationPerWord);
-      const wordEnd = wordStart + durationPerWord;
-      const isCurrentWord = currentTime >= wordStart && currentTime <= wordEnd;
-      
-      let className = 'sub-word';
-      if (isSearchWord) {
-        className += ' search-word-highlight';
-      }
-      if (isCurrentWord) {
-        className += ' current-word-highlight';
-      }
-      
-      return `<span class="${className}" data-start="${wordStart}" data-end="${wordEnd}">${word}</span>`;
-    });
-    
-    fullText += segmentWords.join(' ') + ' ';
-  });
-
-  subtitleBox.innerHTML = fullText;
-  subStatus.textContent = 'live';
-  subStatus.classList.add('live');
-  subtitleBox.classList.add('active');
-}
-
 function updateSubtitleDisplay(currentTime) {
   const subtitleBox = document.getElementById('subtitleBox');
-  if (!subtitleBox) return;
+  const subStatus = document.getElementById('subStatus');
 
-  displayFullTranscript(currentTime);
-  
-  const currentWordElement = subtitleBox.querySelector('.current-word-highlight');
-  if (currentWordElement) {
-    currentWordElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (!subtitleBox || !subStatus) return;
+
+  const currentSegment = currentTranscript.find(seg => 
+    currentTime >= seg.start && currentTime <= (seg.start + seg.duration)
+  );
+
+  if (currentSegment) {
+    const highlightedText = highlightCurrentWord(currentSegment.text, currentTime);
+    subtitleBox.innerHTML = highlightedText;
+    subStatus.textContent = 'live';
+    subStatus.classList.add('live');
+    subtitleBox.classList.add('active');
+  } else {
+    const nextSegment = currentTranscript.find(seg => seg.start > currentTime);
+    if (nextSegment && (nextSegment.start - currentTime) < 3) {
+      subtitleBox.innerHTML = `<span class="sub-placeholder">${nextSegment.text}</span>`;
+      subStatus.textContent = 'upcoming';
+      subStatus.classList.remove('live');
+      subtitleBox.classList.remove('active');
+    } else {
+      subtitleBox.innerHTML = '<span class="sub-placeholder">Subtitles will appear here during playback…</span>';
+      subStatus.textContent = 'waiting';
+      subStatus.classList.remove('live');
+      subtitleBox.classList.remove('active');
+    }
   }
+}
+
+function highlightCurrentWord(text, currentTime) {
+  if (!wordTimings.length) return text;
+
+  const currentWord = wordTimings.find(w => 
+    currentTime >= w.start && currentTime <= w.end
+  );
+
+  if (!currentWord) return text;
+
+  const words = text.split(/(\s+)/);
+  return words.map(word => {
+    const cleanWord = word.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const targetClean = currentWord.word.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    if (cleanWord === targetClean && currentTime >= currentWord.start && currentTime <= currentWord.end) {
+      return `<span class="sub-word current">${word}</span>`;
+    }
+    return `<span class="sub-word">${word}</span>`;
+  }).join('');
 }
 
 function startProgress() {
@@ -1307,7 +1114,7 @@ function hideStatus() {
 function showError(msg) {
   document.getElementById('errorText').textContent = msg;
   document.getElementById('errorBar').classList.add('visible');
-  setTimeout(hideError, 6000);
+  setTimeout(hideError, 5000);
 }
 
 function hideError() {
@@ -1318,7 +1125,7 @@ document.getElementById('searchInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') doSearch();
 });
 
-debugLog('PronounceIt initialized with Invidious support');
+debugLog('PronounceIt initialized');
 </script>
 
   </div>
