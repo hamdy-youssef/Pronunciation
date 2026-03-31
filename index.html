@@ -20,6 +20,7 @@
     --uk-color: #47c8ff;
     --danger: #ff6b6b;
     --radius: 12px;
+    --search-word: #ff4757;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -277,39 +278,72 @@
     letter-spacing: 0.15em; color: var(--muted);
     text-transform: uppercase; margin-bottom: 10px;
   }
-  .subtitle-box {
+  
+  /* New external subtitle text field styles */
+  .subtitle-external-box {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 20px 24px; min-height: 90px;
+    border-radius: var(--radius); padding: 20px 24px;
     font-family: 'DM Mono', monospace; font-size: 15px;
-    font-weight: 300; font-style: italic; color: var(--text);
-    line-height: 1.7; position: relative; transition: border-color 0.3s;
+    font-weight: 300; color: var(--text);
+    line-height: 1.8; position: relative; transition: border-color 0.3s;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
   }
-  .subtitle-box.active { border-color: rgba(232,255,71,0.3); }
-  .sub-highlight {
-    color: var(--accent);
-    font-style: normal;
-    font-weight: 600;
-    background: rgba(232,255,71,0.15);
-    border-radius: 3px;
+  
+  .subtitle-external-box::-webkit-scrollbar {
+    width: 8px;
+  }
+  .subtitle-external-box::-webkit-scrollbar-track {
+    background: var(--surface2);
+    border-radius: 4px;
+  }
+  .subtitle-external-box::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+  }
+  .subtitle-external-box::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+  }
+  
+  .subtitle-external-box.active { 
+    border-color: rgba(232,255,71,0.3); 
+  }
+  
+  /* Red underline for search word */
+  .search-word-highlight {
+    color: var(--search-word);
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-color: var(--search-word);
+    text-decoration-thickness: 3px;
+    text-underline-offset: 4px;
+    background: rgba(255, 71, 87, 0.15);
     padding: 2px 4px;
-    transition: all 0.2s ease;
+    border-radius: 4px;
   }
-  .sub-word {
-    display: inline-block;
-    margin: 0 2px;
-    padding: 2px 4px;
-    border-radius: 3px;
-    transition: all 0.2s ease;
-  }
-  .sub-word.current {
+  
+  /* Yellow highlight for currently spoken word */
+  .current-word-highlight {
     color: var(--accent);
-    font-weight: 600;
-    background: rgba(232,255,71,0.2);
-    transform: scale(1.05);
+    font-weight: 700;
+    background: rgba(232, 255, 71, 0.25);
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: all 0.15s ease;
   }
+  
   .sub-placeholder { color: var(--muted); font-style: normal; font-size: 13px; }
+  
+  .subtitle-status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  
   .subtitle-status {
-    position: absolute; top: 12px; right: 16px;
     font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
   }
   .subtitle-status.live {
@@ -380,6 +414,7 @@
     .ctrl-btn { min-width: 36px; height: 36px; padding: 0 10px; }
   }
 </style>
+<base target="_blank">
 <base target="_blank">
 </head>
 <body>
@@ -467,10 +502,12 @@
   </div>
 
   <div class="subtitle-section" id="subtitleSection">
-    <div class="subtitle-label">Subtitles / Captions</div>
-    <div class="subtitle-box" id="subtitleBox">
-      <span class="sub-placeholder">Subtitles will appear here during playback…</span>
+    <div class="subtitle-status-bar">
+      <div class="subtitle-label">Full Video Transcript</div>
       <span class="subtitle-status" id="subStatus">waiting</span>
+    </div>
+    <div class="subtitle-external-box" id="subtitleBox">
+      <span class="sub-placeholder">Subtitles will appear here when video starts...</span>
     </div>
   </div>
 
@@ -498,6 +535,7 @@ let isPlaying = false;
 let currentTranscript = [];
 let wordTimings = [];
 let currentSearchWord = '';
+let currentMatchTime = 0; // Store the exact time where word appears
 
 function debugLog(message, type = 'info') {
   console.log(`[${type.toUpperCase()}] ${message}`);
@@ -513,7 +551,15 @@ function onYouTubeIframeAPIReady() {
       autoplay: 1, 
       rel: 0,
       enablejsapi: 1,
-      origin: window.location.origin
+      origin: window.location.origin,
+      // Disable ads and related content
+      iv_load_policy: 3, // Disable video annotations
+      modestbranding: 1, // Minimal YouTube branding
+      playsinline: 1,
+      controls: 1,
+      disablekb: 0,
+      fs: 1,
+      // Note: Ad blocking is limited by YouTube's API, but we minimize interruptions
     },
     events: {
       onReady: () => { 
@@ -736,13 +782,14 @@ async function doSearch() {
   setStatus("Searching videos...");
   document.getElementById('searchBtn').disabled = true;
 
-  const accentLabel = currentAccent === 'US'
-    ? 'American English pronunciation how to pronounce'
-    : 'British English pronunciation how to pronounce';
+  // BROAD SEARCH: Search for ANY video containing the word, not just educational content
+  // No accent label restriction - search all YouTube content
+  const searchQuery = `"${q}"`; // Exact phrase search for better accuracy
 
   try {
+    // Request maximum results (50 is API limit per request, but we check ALL of them)
     const searchRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=50&q=${encodeURIComponent(q + " " + accentLabel)}&key=${API_KEY}`
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=50&q=${encodeURIComponent(searchQuery)}&key=${API_KEY}`
     );
 
     const searchData = await searchRes.json();
@@ -792,6 +839,7 @@ async function doSearch() {
       return;
     }
 
+    // Check ALL videos (no limit) to find the word
     await findAndPlayWord(q);
 
   } catch (err) {
@@ -805,9 +853,10 @@ async function doSearch() {
 
 async function findAndPlayWord(word) {
   const wordLower = word.toLowerCase().trim();
-  debugLog(`Searching for word: "${wordLower}"`);
+  debugLog(`Searching for word: "${wordLower}" in ALL ${videos.length} videos`);
 
-  const videosToCheck = videos.slice(0, 15);
+  // Check ALL videos, no limit
+  const videosToCheck = videos; 
 
   for (let i = 0; i < videosToCheck.length; i++) {
     const video = videosToCheck[i];
@@ -825,40 +874,73 @@ async function findAndPlayWord(word) {
       debugLog(`Video ${i + 1}: Got ${transcript.length} transcript segments`);
 
       let match = null;
+      let matchTime = 0;
 
-      match = transcript.find(item => {
-        const words = item.text.toLowerCase().match(/[a-z]+/g) || [];
-        return words.includes(wordLower);
-      });
-
-      if (!match) {
-        match = transcript.find(item => 
-          item.text.toLowerCase().includes(wordLower)
-        );
+      // Look for exact word match with precise timing
+      for (let j = 0; j < transcript.length; j++) {
+        const segment = transcript[j];
+        const words = segment.text.toLowerCase().match(/[a-z]+/g) || [];
+        
+        // Check if exact word exists in this segment
+        if (words.includes(wordLower)) {
+          match = segment;
+          // Calculate approximate position within segment
+          const segmentWords = segment.text.split(/\s+/);
+          const wordIndex = segmentWords.findIndex(w => 
+            w.toLowerCase().replace(/[^a-z]/g, '') === wordLower
+          );
+          if (wordIndex !== -1) {
+            const durationPerWord = segment.duration / segmentWords.length;
+            matchTime = segment.start + (wordIndex * durationPerWord);
+          } else {
+            matchTime = segment.start;
+          }
+          break;
+        }
       }
 
+      // Fallback: partial match
+      if (!match) {
+        for (let j = 0; j < transcript.length; j++) {
+          const segment = transcript[j];
+          if (segment.text.toLowerCase().includes(wordLower)) {
+            match = segment;
+            matchTime = segment.start;
+            break;
+          }
+        }
+      }
+
+      // Fallback: variations
       if (!match && wordLower.length > 3) {
-        match = transcript.find(item => {
-          const text = item.text.toLowerCase();
-          return text.includes(wordLower.slice(0, -1)) ||
-                 text.includes(wordLower + 's') ||
-                 text.includes(wordLower + 'es') ||
-                 text.includes(wordLower + 'ed') ||
-                 text.includes(wordLower + 'ing');
-        });
+        for (let j = 0; j < transcript.length; j++) {
+          const segment = transcript[j];
+          const text = segment.text.toLowerCase();
+          if (text.includes(wordLower.slice(0, -1)) ||
+              text.includes(wordLower + 's') ||
+              text.includes(wordLower + 'es') ||
+              text.includes(wordLower + 'ed') ||
+              text.includes(wordLower + 'ing')) {
+            match = segment;
+            matchTime = segment.start;
+            break;
+          }
+        }
       }
 
       if (match) {
-        debugLog(`Found "${word}" at ${match.start}s in video ${videoId}`, 'success');
+        debugLog(`Found "${word}" at ${matchTime}s in video ${videoId}`, 'success');
 
         currentIndex = videos.indexOf(video);
         currentTranscript = transcript;
+        currentMatchTime = matchTime; // Store exact match time
 
-        buildWordTimings(transcript);
+        buildWordTimings(transcript, wordLower);
 
-        playVideoAtTime(currentIndex, match.start);
+        // Play video starting EXACTLY at the word timestamp
+        playVideoAtTime(currentIndex, matchTime);
 
-        setStatus(`Found "${word}" at ${formatTime(match.start)}!`);
+        setStatus(`Found "${word}" at ${formatTime(matchTime)}!`);
         setTimeout(hideStatus, 2000);
 
         return;
@@ -875,8 +957,9 @@ async function findAndPlayWord(word) {
   playVideo(0);
 }
 
-function buildWordTimings(transcript) {
+function buildWordTimings(transcript, searchWord) {
   wordTimings = [];
+  const searchWordLower = searchWord.toLowerCase();
 
   transcript.forEach(segment => {
     const words = segment.text.split(/\s+/);
@@ -884,18 +967,24 @@ function buildWordTimings(transcript) {
 
     words.forEach((word, index) => {
       const cleanWord = word.replace(/[^a-zA-Z0-9]/g, '');
+      const cleanWordLower = cleanWord.toLowerCase();
       if (cleanWord) {
         wordTimings.push({
           word: cleanWord,
+          fullWord: word,
           start: segment.start + (index * durationPerWord),
           end: segment.start + ((index + 1) * durationPerWord),
-          fullText: word
+          isSearchWord: cleanWordLower === searchWordLower || 
+                       cleanWordLower === searchWordLower + 's' ||
+                       cleanWordLower === searchWordLower + 'es' ||
+                       cleanWordLower === searchWordLower + 'ed' ||
+                       cleanWordLower === searchWordLower + 'ing'
         });
       }
     });
   });
 
-  debugLog(`Built ${wordTimings.length} word timings`);
+  debugLog(`Built ${wordTimings.length} word timings, marked search word: "${searchWord}"`);
 }
 
 function playVideoAtTime(index, startTime) {
@@ -908,27 +997,31 @@ function playVideoAtTime(index, startTime) {
   document.getElementById('subtitleSection').classList.add('visible');
   document.getElementById('nowTitle').textContent = videos[index].snippet.title;
 
-  debugLog(`Playing video ${vid} at ${startTime}s`);
+  debugLog(`Playing video ${vid} at EXACT time ${startTime}s`);
 
   if (playerReady && player) {
+    // Load video and seek to exact timestamp immediately
     player.loadVideoById({
       videoId: vid,
       startSeconds: startTime,
       suggestedQuality: 'default'
     });
 
+    // Ensure we start at the exact time
     setTimeout(() => {
       if (player && player.seekTo) {
         player.seekTo(startTime, true);
         player.playVideo();
+        debugLog(`Seeked to ${startTime}s and playing`);
       }
-    }, 500);
+    }, 300);
   } else {
     debugLog('Player not ready, retrying...', 'error');
     setTimeout(() => playVideoAtTime(index, startTime), 500);
   }
 
-  updateSubtitleDisplay(startTime);
+  // Display full transcript immediately
+  displayFullTranscript(startTime);
 }
 
 function playVideo(index) {
@@ -964,15 +1057,43 @@ async function findAndPlayWordInVideo(index, word) {
 
   if (transcript.length > 0) {
     currentTranscript = transcript;
-    buildWordTimings(transcript);
-
+    
     const wordLower = word.toLowerCase();
-    const match = transcript.find(item => 
-      item.text.toLowerCase().includes(wordLower)
-    );
+    let match = null;
+    let matchTime = 0;
+
+    // Find exact match with timing
+    for (let j = 0; j < transcript.length; j++) {
+      const segment = transcript[j];
+      const words = segment.text.toLowerCase().match(/[a-z]+/g) || [];
+      
+      if (words.includes(wordLower)) {
+        match = segment;
+        const segmentWords = segment.text.split(/\s+/);
+        const wordIndex = segmentWords.findIndex(w => 
+          w.toLowerCase().replace(/[^a-z]/g, '') === wordLower
+        );
+        if (wordIndex !== -1) {
+          const durationPerWord = segment.duration / segmentWords.length;
+          matchTime = segment.start + (wordIndex * durationPerWord);
+        } else {
+          matchTime = segment.start;
+        }
+        break;
+      }
+    }
+
+    if (!match) {
+      match = transcript.find(item => 
+        item.text.toLowerCase().includes(wordLower)
+      );
+      if (match) matchTime = match.start;
+    }
+
+    buildWordTimings(transcript, word);
 
     if (match) {
-      playVideoAtTime(index, match.start);
+      playVideoAtTime(index, matchTime);
     } else {
       playVideo(index);
     }
@@ -1020,57 +1141,73 @@ function startCaptionSync() {
   }, 100);
 }
 
-function updateSubtitleDisplay(currentTime) {
+// NEW: Display full transcript with red underline for search word and yellow highlight for current word
+function displayFullTranscript(currentTime) {
   const subtitleBox = document.getElementById('subtitleBox');
   const subStatus = document.getElementById('subStatus');
-
+  
   if (!subtitleBox || !subStatus) return;
 
-  const currentSegment = currentTranscript.find(seg => 
-    currentTime >= seg.start && currentTime <= (seg.start + seg.duration)
-  );
-
-  if (currentSegment) {
-    const highlightedText = highlightCurrentWord(currentSegment.text, currentTime);
-    subtitleBox.innerHTML = highlightedText;
-    subStatus.textContent = 'live';
-    subStatus.classList.add('live');
-    subtitleBox.classList.add('active');
-  } else {
-    const nextSegment = currentTranscript.find(seg => seg.start > currentTime);
-    if (nextSegment && (nextSegment.start - currentTime) < 3) {
-      subtitleBox.innerHTML = `<span class="sub-placeholder">${nextSegment.text}</span>`;
-      subStatus.textContent = 'upcoming';
-      subStatus.classList.remove('live');
-      subtitleBox.classList.remove('active');
-    } else {
-      subtitleBox.innerHTML = '<span class="sub-placeholder">Subtitles will appear here during playback…</span>';
-      subStatus.textContent = 'waiting';
-      subStatus.classList.remove('live');
-      subtitleBox.classList.remove('active');
-    }
+  if (!currentTranscript || currentTranscript.length === 0) {
+    subtitleBox.innerHTML = '<span class="sub-placeholder">No transcript available for this video.</span>';
+    return;
   }
+
+  // Build full transcript HTML
+  let fullText = '';
+  const searchWordLower = currentSearchWord.toLowerCase();
+
+  currentTranscript.forEach((segment, index) => {
+    const words = segment.text.split(/\s+/);
+    const segmentWords = words.map((word, wordIndex) => {
+      const cleanWord = word.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      
+      // Check if this is the search word (red underline)
+      const isSearchWord = cleanWord === searchWordLower ||
+                          cleanWord === searchWordLower + 's' ||
+                          cleanWord === searchWordLower + 'es' ||
+                          cleanWord === searchWordLower + 'ed' ||
+                          cleanWord === searchWordLower + 'ing';
+      
+      // Determine if this word is currently being spoken
+      const durationPerWord = segment.duration / words.length;
+      const wordStart = segment.start + (wordIndex * durationPerWord);
+      const wordEnd = wordStart + durationPerWord;
+      const isCurrentWord = currentTime >= wordStart && currentTime <= wordEnd;
+      
+      let className = 'sub-word';
+      if (isSearchWord) {
+        className += ' search-word-highlight';
+      }
+      if (isCurrentWord) {
+        className += ' current-word-highlight';
+      }
+      
+      return `<span class="${className}" data-start="${wordStart}" data-end="${wordEnd}">${word}</span>`;
+    });
+    
+    fullText += segmentWords.join(' ') + ' ';
+  });
+
+  subtitleBox.innerHTML = fullText;
+  subStatus.textContent = 'live';
+  subStatus.classList.add('live');
+  subtitleBox.classList.add('active');
 }
 
-function highlightCurrentWord(text, currentTime) {
-  if (!wordTimings.length) return text;
+function updateSubtitleDisplay(currentTime) {
+  // Update the full transcript highlighting
+  const subtitleBox = document.getElementById('subtitleBox');
+  if (!subtitleBox) return;
 
-  const currentWord = wordTimings.find(w => 
-    currentTime >= w.start && currentTime <= w.end
-  );
-
-  if (!currentWord) return text;
-
-  const words = text.split(/(\s+)/);
-  return words.map(word => {
-    const cleanWord = word.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-    const targetClean = currentWord.word.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-    if (cleanWord === targetClean && currentTime >= currentWord.start && currentTime <= currentWord.end) {
-      return `<span class="sub-word current">${word}</span>`;
-    }
-    return `<span class="sub-word">${word}</span>`;
-  }).join('');
+  // Re-render with updated current word highlighting
+  displayFullTranscript(currentTime);
+  
+  // Auto-scroll to current segment
+  const currentWordElement = subtitleBox.querySelector('.current-word-highlight');
+  if (currentWordElement) {
+    currentWordElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 
 function startProgress() {
