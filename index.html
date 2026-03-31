@@ -1,280 +1,1051 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PronounceIt — Hear It Right</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
-<style>
-:root {
-    --bg: #0b0c10; --surface: #13151c; --surface2: #1c1f2b;
-    --border: #252836; --accent: #e8ff47; --accent2: #47c8ff;
-    --text: #eef0f6; --muted: #6b7090; --us-color: #e8ff47;
-    --uk-color: #47c8ff; --danger: #ff6b6b; --radius: 12px;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--text); font-family: 'Syne', sans-serif; min-height: 100vh; overflow-x: hidden; display:flex; flex-direction:column;}
-body::before{content:'';position:fixed;top:-40%;left:-20%;width:80vw;height:80vh;background:radial-gradient(ellipse,rgba(232,255,71,0.04) 0%,transparent 70%);pointer-events:none;z-index:0;}
-body::after{content:'';position:fixed;bottom:-30%;right:-20%;width:70vw;height:70vh;background:radial-gradient(ellipse,rgba(71,200,255,0.05) 0%,transparent 70%);pointer-events:none;z-index:0;}
-.page-wrapper { flex: 1 0 auto; }
-.footer { flex-shrink:0;padding:24px 16px;text-align:center;border-top:1px solid var(--border);background:var(--surface);position:relative;z-index:1;}
-.footer-content p { font-size:13px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:6px;}
-.footer-content a { font-size:13px;color:var(--accent);text-decoration:none;font-family:'DM Mono',monospace;transition:opacity 0.2s;}
-.footer-content a:hover { opacity:0.7; }
-.wrapper { position:relative;z-index:1;max-width:860px;margin:0 auto;padding:48px 24px 80px; }
-header{margin-bottom:48px;animation:fadeDown 0.6s ease both;}
-header .eyebrow { font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.2em;color:var(--accent);text-transform:uppercase;margin-bottom:8px;}
-header h1 { font-size:clamp(2rem,5vw,3.2rem);font-weight:800;line-height:1.05;letter-spacing:-0.02em;}
-header h1 span{color:var(--accent);}
-header p{margin-top:12px;color:var(--muted);font-size:15px;font-weight:400;max-width:460px;}
-.search-section { background: var(--surface); border:1px solid var(--border); border-radius:16px;padding:24px;margin-bottom:24px; animation: fadeDown 0.6s 0.1s ease both;}
-.search-label { font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:12px;}
-.search-row { display:flex; gap:12px; align-items:stretch; }
-.search-input-wrap { flex:1; position:relative; }
-.search-input-wrap svg { position:absolute; left:16px; top:50%; transform:translateY(-50%); opacity:0.35; }
-#searchInput { width:100%; height:56px; background:var(--bg); border:1.5px solid var(--border); border-radius:10px; padding:0 16px 0 48px; color:var(--text); font-family:'Syne',sans-serif; font-size:16px; font-weight:600; outline:none; transition:border-color 0.25s, box-shadow 0.25s;}
-#searchInput::placeholder { color:var(--muted); font-weight:400;}
-#searchInput:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,255,71,0.1);}
-.search-btn{height:56px;padding:0 28px;background:var(--accent);color:#0b0c10;border:none;border-radius:10px;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:transform 0.15s,opacity 0.2s;white-space:nowrap;}
-.search-btn:hover{opacity:0.9;transform:translateY(-1px);}
-.search-btn:active{transform:translateY(0);}
-.search-btn:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
-.accent-row { display:flex; gap:12px; margin-top:16px; }
-.accent-btn { flex:1;height:48px;background:transparent;border:1.5px solid var(--border);border-radius:10px;color:var(--muted);font-family:'Syne',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.05em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;position:relative;overflow:hidden; }
-.accent-btn .flag { font-size:20px; }
-.accent-btn.active[data-accent="US"]{border-color:var(--us-color);color:var(--us-color);background:rgba(232,255,71,0.06);}
-.accent-btn.active[data-accent="UK"]{border-color:var(--uk-color);color:var(--uk-color);background:rgba(71,200,255,0.06);}
-.accent-btn::after{content:'';position:absolute;inset:0;background:currentColor;opacity:0;transition:opacity 0.2s;}
-.accent-btn:hover::after{opacity:0.04;}
-.status-bar, .error-bar { display:none; align-items:center; gap:10px; padding:14px 18px; border-radius:var(--radius); font-family:'DM Mono',monospace; font-size:13px;}
-.status-bar { background:var(--surface); border:1px solid var(--border); }
-.status-bar.visible, .error-bar.visible { display:flex; }
-.spinner { width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0;}
-.error-bar { background: rgba(255,107,107,0.06); border:1px solid rgba(255,107,107,0.25); color:var(--danger);}
-.player-section { display:none; animation:fadeDown 0.5s ease both; margin-bottom:16px; }
-.player-section.visible { display:block; }
-.player-wrap { background:var(--surface); border:1px solid var(--border); border-radius:16px; overflow:hidden; margin-bottom:16px;}
-.player-now-playing { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px;}
-.now-badge{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;background:var(--accent);color:#0b0c10;padding:3px 8px;border-radius:4px;font-weight:600;}
-.now-title { font-size:13px; font-weight:600; color:var(--text); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-.now-accent-badge.US { background: rgba(232,255,71,0.12); color:var(--us-color);}
-.now-accent-badge.UK { background: rgba(71,200,255,0.12); color:var(--uk-color);}
-#playerContainer { width:100%; aspect-ratio:16/9; background:#000; position:relative;}
-#playerContainer iframe, #playerContainer > div { width:100% !important; height:100% !important; position:absolute; top:0; left:0;}
-.progress-wrap { padding:10px 20px 4px; background:var(--surface); }
-.progress-bar-bg { height:4px; background:var(--border); border-radius:2px; cursor:pointer; position:relative; }
-.progress-bar-fill { height:100%; background:var(--accent); border-radius:2px; width:0%; transition:width 0.4s linear; position:relative;}
-.progress-bar-fill::after { content:''; position:absolute; right:-5px; top:-3px; width:10px;height:10px;background:var(--accent); border-radius:50%; }
-.controls { padding:16px 20px; border-top:1px solid var(--border); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-.ctrl-btn { height:40px; min-width:40px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'DM Mono',monospace;font-size:12px; cursor:pointer; transition:all 0.15s; display:flex; align-items:center; justify-content:center; gap:5px; padding:0 14px; }
-.ctrl-btn:hover{background:var(--border); border-color:var(--muted);}
-.ctrl-btn:active{transform:scale(0.96);}
-.ctrl-btn.primary { background:var(--accent); color:#0b0c10; border-color:transparent; min-width:52px; font-weight:700;}
-.ctrl-btn.primary:hover{opacity:0.9;}
-.ctrl-btn svg{width:16px;height:16px;fill:currentColor;flex-shrink:0;}
-.ctrl-spacer{flex:1;}
-.subtitle-section{margin-top:16px; display:none; animation:fadeDown 0.5s ease both;}
-.subtitle-section.visible{display:block;}
-.subtitle-label{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
-.subtitle-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;min-height:90px;font-family:'DM Mono',monospace;font-size:15px;font-weight:300;font-style:italic;color:var(--text);line-height:1.7;position:relative;transition:border-color 0.3s;}
-.sub-placeholder{color:var(--muted);font-style:normal;font-size:13px;}
-.translation-box{margin-top:12px;padding:16px 20px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);display:none;}
-.translation-box.visible{display:block;}
-.translation-label{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;}
-.translation-text{font-family:'Syne',sans-serif;font-size:14px;color:var(--text);line-height:1.6;}
-@keyframes fadeDown{from{opacity:0;transform:translateY(-12px);}to{opacity:1;transform:translateY(0);}}
-@keyframes spin{to{transform:rotate(360deg);}}
-@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
-@media(max-width:560px){.search-row{flex-direction:column;}.search-btn{height:48px;}.controls{gap:8px;}.ctrl-btn{min-width:36px;height:36px;padding:0 10px;}}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PronounceIt — Hear It Right</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0b0c10;
+            --surface: #13151c;
+            --surface2: #1c1f2b;
+            --border: #252836;
+            --accent: #e8ff47;
+            --accent2: #47c8ff;
+            --text: #eef0f6;
+            --muted: #6b7090;
+            --us-color: #e8ff47;
+            --uk-color: #47c8ff;
+            --danger: #ff6b6b;
+            --radius: 12px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Syne', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            top: -40%; left: -20%;
+            width: 80vw; height: 80vh;
+            background: radial-gradient(ellipse, rgba(232,255,71,0.04) 0%, transparent 70%);
+            pointer-events: none; z-index: 0;
+        }
+        body::after {
+            content: '';
+            position: fixed;
+            bottom: -30%; right: -20%;
+            width: 70vw; height: 70vh;
+            background: radial-gradient(ellipse, rgba(71,200,255,0.05) 0%, transparent 70%);
+            pointer-events: none; z-index: 0;
+        }
+        body { display: flex; flex-direction: column; min-height: 100vh; }
+        .page-wrapper { flex: 1 0 auto; }
+        .footer {
+            flex-shrink: 0;
+            padding: 24px 16px;
+            text-align: center;
+            border-top: 1px solid var(--border);
+            background: var(--surface);
+            position: relative;
+            z-index: 1;
+        }
+        .footer-content p {
+            font-size: 13px; color: var(--muted);
+            font-family: 'DM Mono', monospace;
+            margin-bottom: 6px;
+        }
+        .footer-content a {
+            font-size: 13px; color: var(--accent);
+            text-decoration: none;
+            font-family: 'DM Mono', monospace;
+            transition: opacity 0.2s;
+        }
+        .footer-content a:hover { opacity: 0.7; }
+        .wrapper {
+            position: relative; z-index: 1;
+            max-width: 860px; margin: 0 auto;
+            padding: 48px 24px 80px;
+        }
+        header { margin-bottom: 48px; animation: fadeDown 0.6s ease both; }
+        header .eyebrow {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px; letter-spacing: 0.2em;
+            color: var(--accent); text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        header h1 {
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 800; line-height: 1.05; letter-spacing: -0.02em;
+        }
+        header h1 span { color: var(--accent); }
+        header p {
+            margin-top: 12px; color: var(--muted);
+            font-size: 15px; font-weight: 400; max-width: 460px;
+        }
+        .search-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            animation: fadeDown 0.6s 0.1s ease both;
+        }
+        .search-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px; letter-spacing: 0.15em;
+            color: var(--muted); text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+        .search-row {
+            display: flex; gap: 12px;
+            align-items: stretch;
+        }
+        .search-input-wrap { flex: 1; position: relative; }
+        .search-input-wrap svg {
+            position: absolute; left: 16px; top: 50%;
+            transform: translateY(-50%); opacity: 0.35;
+        }
+        #searchInput {
+            width: 100%; height: 56px;
+            background: var(--bg);
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            padding: 0 16px 0 48px;
+            color: var(--text);
+            font-family: 'Syne', sans-serif;
+            font-size: 16px; font-weight: 600;
+            outline: none;
+            transition: border-color 0.25s, box-shadow 0.25s;
+        }
+        #searchInput::placeholder { color: var(--muted); font-weight: 400; }
+        #searchInput:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(232,255,71,0.1);
+        }
+        .search-btn {
+            height: 56px; padding: 0 28px;
+            background: var(--accent);
+            color: #0b0c10; border: none;
+            border-radius: 10px;
+            font-family: 'Syne', sans-serif;
+            font-size: 15px; font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.15s, opacity 0.2s;
+            white-space: nowrap;
+        }
+        .search-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .search-btn:active { transform: translateY(0); }
+        .search-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+        .accent-row {
+            display: flex; gap: 12px;
+            margin-top: 16px;
+        }
+        .accent-btn {
+            flex: 1; height: 48px;
+            background: transparent;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            color: var(--muted);
+            font-family: 'Syne', sans-serif;
+            font-size: 14px; font-weight: 700;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        .accent-btn .flag { font-size: 20px; }
+        .accent-btn.active[data-accent="US"] {
+            border-color: var(--us-color);
+            color: var(--us-color);
+            background: rgba(232,255,71,0.06);
+        }
+        .accent-btn.active[data-accent="UK"] {
+            border-color: var(--uk-color);
+            color: var(--uk-color);
+            background: rgba(71,200,255,0.06);
+        }
+        .accent-btn::after {
+            content: ''; position: absolute; inset: 0;
+            background: currentColor; opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .accent-btn:hover::after { opacity: 0.04; }
+        
+        /* Hidden results section */
+        .results-section { display: none; }
+        
+        .player-section {
+            display: none;
+            animation: fadeDown 0.5s ease both;
+        }
+        .player-section.visible { display: block; }
+        .player-wrap {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+        .player-now-playing {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .now-badge {
+            font-family: 'DM Mono', monospace;
+            font-size: 10px; letter-spacing: 0.15em;
+            text-transform: uppercase;
+            background: var(--accent);
+            color: #0b0c10;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .now-title {
+            font-size: 13px; font-weight: 600;
+            color: var(--text); flex: 1;
+            white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .now-accent-badge {
+            font-family: 'DM Mono', monospace;
+            font-size: 10px; padding: 3px 8px;
+            border-radius: 4px; font-weight: 600;
+            flex-shrink: 0;
+        }
+        .now-accent-badge.US {
+            background: rgba(232,255,71,0.12);
+            color: var(--us-color);
+        }
+        .now-accent-badge.UK {
+            background: rgba(71,200,255,0.12);
+            color: var(--uk-color);
+        }
+        #playerContainer {
+            width: 100%; aspect-ratio: 16/9;
+            background: #000; position: relative;
+        }
+        #playerContainer iframe, #playerContainer > div {
+            width: 100% !important; height: 100% !important;
+            position: absolute; top: 0; left: 0;
+        }
+        .progress-wrap {
+            padding: 10px 20px 4px;
+            background: var(--surface);
+        }
+        .progress-bar-bg {
+            height: 4px; background: var(--border);
+            border-radius: 2px; cursor: pointer;
+            position: relative;
+        }
+        .progress-bar-fill {
+            height: 100%; background: var(--accent);
+            border-radius: 2px; width: 0%;
+            transition: width 0.4s linear;
+            position: relative;
+        }
+        .progress-bar-fill::after {
+            content: ''; position: absolute;
+            right: -5px; top: -3px;
+            width: 10px; height: 10px;
+            background: var(--accent);
+            border-radius: 50%;
+        }
+        .controls {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px; flex-wrap: wrap;
+        }
+        .ctrl-btn {
+            height: 40px; min-width: 40px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: 'DM Mono', monospace;
+            font-size: 12px; cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px; padding: 0 14px;
+        }
+        .ctrl-btn:hover { background: var(--border); border-color: var(--muted); }
+        .ctrl-btn:active { transform: scale(0.96); }
+        .ctrl-btn.primary {
+            background: var(--accent);
+            color: #0b0c10;
+            border-color: transparent;
+            min-width: 52px; font-weight: 700;
+        }
+        .ctrl-btn.primary:hover { opacity: 0.9; }
+        .ctrl-btn svg {
+            width: 16px; height: 16px;
+            fill: currentColor; flex-shrink: 0;
+        }
+        .ctrl-spacer { flex: 1; }
+        
+        /* Subtitle Section - Now below video */
+        .subtitle-section {
+            margin-top: 16px;
+            display: none;
+            animation: fadeDown 0.5s ease both;
+        }
+        .subtitle-section.visible { display: block; }
+        .subtitle-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px; letter-spacing: 0.15em;
+            color: var(--muted); text-transform: uppercase;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .subtitle-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            min-height: 90px;
+            font-family: 'DM Mono', monospace;
+            font-size: 15px; font-weight: 300;
+            font-style: italic;
+            color: var(--text);
+            line-height: 1.7;
+            position: relative;
+            transition: border-color 0.3s;
+        }
+        .subtitle-box.active { border-color: rgba(232,255,71,0.3); }
+        .sub-word {
+            display: inline-block;
+            margin: 0 2px;
+            padding: 2px 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .sub-word.highlight {
+            background: rgba(232,255,71,0.2);
+            color: var(--accent);
+            font-style: normal;
+            font-weight: 600;
+            transform: scale(1.05);
+        }
+        .sub-word.search-word {
+            background: rgba(71,200,255,0.2);
+            color: var(--accent2);
+            font-weight: 600;
+        }
+        .sub-placeholder { color: var(--muted); font-style: normal; font-size: 13px; }
+        .subtitle-status {
+            position: absolute; top: 12px; right: 16px;
+            font-size: 10px; letter-spacing: 0.1em;
+            text-transform: uppercase; color: var(--muted);
+        }
+        .subtitle-status.live {
+            color: var(--accent);
+            display: flex; align-items: center; gap: 5px;
+        }
+        .subtitle-status.live::before {
+            content: ''; width: 6px; height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: pulse 1.2s infinite;
+        }
+        
+        /* Translate Button */
+        .translate-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--accent);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .translate-btn:hover {
+            background: rgba(232,255,71,0.1);
+            border-color: var(--accent);
+        }
+        
+        /* Translation Result Box */
+        .translation-box {
+            margin-top: 12px;
+            padding: 16px 20px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            display: none;
+        }
+        .translation-box.visible { display: block; }
+        .translation-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 8px;
+        }
+        .translation-text {
+            font-family: 'Syne', sans-serif;
+            font-size: 14px;
+            color: var(--text);
+            line-height: 1.6;
+        }
+        
+        .status-bar {
+            display: none; align-items: center;
+            gap: 10px; padding: 14px 18px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 16px;
+            font-size: 13px; color: var(--muted);
+            font-family: 'DM Mono', monospace;
+        }
+        .status-bar.visible { display: flex; }
+        .spinner {
+            width: 16px; height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            flex-shrink: 0;
+        }
+        .error-bar {
+            display: none; align-items: center;
+            gap: 10px; padding: 14px 18px;
+            background: rgba(255,107,107,0.06);
+            border: 1px solid rgba(255,107,107,0.25);
+            border-radius: var(--radius);
+            margin-bottom: 16px;
+            font-size: 13px; color: var(--danger);
+            font-family: 'DM Mono', monospace;
+        }
+        .error-bar.visible { display: flex; }
+        
+        @keyframes fadeDown {
+            from { opacity: 0; transform: translateY(-12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+        
+        @media (max-width: 560px) {
+            .search-row { flex-direction: column; }
+            .search-btn { height: 48px; }
+            .controls { gap: 8px; }
+            .ctrl-btn { min-width: 36px; height: 36px; padding: 0 10px; }
+        }
+    </style>
 </head>
 <body>
-<div class="page-wrapper">
-<div class="wrapper">
-<header>
-<div class="eyebrow">Pronunciation Tool</div>
-<h1>Hear It <span>Right.</span></h1>
-<p>Search any word or phrase, choose your accent, and hear real native speakers pronounce it.</p>
-</header>
+    <div class="page-wrapper">
+        <div class="wrapper">
+            <header>
+                <div class="eyebrow">Pronunciation Tool</div>
+                <h1>Hear It <span>Right.</span></h1>
+                <p>Search any word or phrase, choose your accent, and hear real native speakers pronounce it.</p>
+            </header>
+            
+            <div class="search-section">
+                <div class="search-label">Search Word or Phrase</div>
+                <div class="search-row">
+                    <div class="search-input-wrap">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                        </svg>
+                        <input type="text" id="searchInput" placeholder="e.g. entrepreneur, schedule, aluminum…" />
+                    </div>
+                    <button class="search-btn" id="searchBtn" onclick="doSearch()">Search</button>
+                </div>
+                <div class="accent-row">
+                    <button class="accent-btn active" data-accent="US" onclick="setAccent('US')">
+                        <span class="flag">🇺🇸</span> American English
+                    </button>
+                    <button class="accent-btn" data-accent="UK" onclick="setAccent('UK')">
+                        <span class="flag">🇬🇧</span> British English
+                    </button>
+                </div>
+            </div>
+            
+            <div class="status-bar" id="statusBar">
+                <div class="spinner"></div>
+                <span id="statusText">Searching YouTube…</span>
+            </div>
+            
+            <div class="error-bar" id="errorBar">
+                <span>⚠</span>
+                <span id="errorText">Something went wrong.</span>
+            </div>
+            
+            <!-- Hidden Results Section -->
+            <div class="results-section" id="resultsSection">
+                <div class="results-header">
+                    <h2>Results</h2>
+                    <span class="count" id="resultsCount"></span>
+                </div>
+                <div class="video-list" id="videoList"></div>
+            </div>
+            
+            <div class="player-section" id="playerSection">
+                <div class="player-wrap">
+                    <div class="player-now-playing">
+                        <span class="now-badge">Now Playing</span>
+                        <span class="now-title" id="nowTitle">—</span>
+                        <span class="now-accent-badge US" id="accentBadge">US</span>
+                    </div>
+                    <div id="playerContainer"></div>
+                    <div class="progress-wrap">
+                        <div class="progress-bar-bg" id="progressBg" onclick="seekByClick(event)">
+                            <div class="progress-bar-fill" id="progressFill"></div>
+                        </div>
+                    </div>
+                    <div class="controls">
+                        <button class="ctrl-btn" onclick="prevVideo()" title="Previous video">
+                            <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+                        </button>
+                        <button class="ctrl-btn" onclick="seekRel(-5)" title="Back 5s">
+                            <svg viewBox="0 0 24 24"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6 8.5 6V6l-8.5 6z"/></svg>
+                            <span>5s</span>
+                        </button>
+                        <button class="ctrl-btn primary" id="playPauseBtn" onclick="togglePlay()">
+                            <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            <svg id="pauseIcon" viewBox="0 0 24 24" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                        </button>
+                        <button class="ctrl-btn" onclick="seekRel(5)" title="Forward 5s">
+                            <svg viewBox="0 0 24 24"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg>
+                            <span>5s</span>
+                        </button>
+                        <button class="ctrl-btn" onclick="nextVideo()" title="Next video">
+                            <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                        </button>
+                        <div class="ctrl-spacer"></div>
+                        <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)" id="timeDisplay">0:00</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Subtitles Section - Now below video -->
+            <div class="subtitle-section" id="subtitleSection">
+                <div class="subtitle-label">
+                    <span>Subtitles / Captions</span>
+                    <button class="translate-btn" id="translateBtn" onclick="translateCurrentText()">Translate</button>
+                </div>
+                <div class="subtitle-box" id="subtitleBox">
+                    <span class="sub-placeholder">Subtitles will appear here during playback…</span>
+                    <span class="subtitle-status" id="subStatus">waiting</span>
+                </div>
+                
+                <!-- Translation Result -->
+                <div class="translation-box" id="translationBox">
+                    <div class="translation-label">Translation</div>
+                    <div class="translation-text" id="translationText"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <footer class="footer">
+        <div class="footer-content">
+            <p>© 2026 Hamdy Youssef. All rights reserved.</p>
+            <a href="mailto:hamdyyoussef962@gmail.com">hamdyyoussef962@gmail.com</a>
+        </div>
+    </footer>
 
-<div class="search-section">
-<div class="search-label">Search Word or Phrase</div>
-<div class="search-row">
-<div class="search-input-wrap">
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-</svg>
-<input type="text" id="searchInput" placeholder="e.g. entrepreneur, schedule, aluminum…" />
-</div>
-<button class="search-btn" id="searchBtn" onclick="doSearch()">Search</button>
-</div>
-<div class="accent-row">
-<button class="accent-btn active" data-accent="US" onclick="setAccent('US')"><span class="flag">🇺🇸</span> American English</button>
-<button class="accent-btn" data-accent="UK" onclick="setAccent('UK')"><span class="flag">🇬🇧</span> British English</button>
-</div>
-</div>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        const API_KEY = 'AIzaSyDGM1AMLvdPGn3fRw79pGMSRVuHfaHjEWc';
+        let currentAccent = 'US';
+        let videos = [];
+        let currentIndex = 0;
+        let player = null;
+        let playerReady = false;
+        let captions = [];
+        let captionTimer = null;
+        let progressTimer = null;
+        let lastWord = '';
+        let isPlaying = false;
+        let currentCaptionText = '';
+        let captionWords = [];
+        let wordTimings = [];
+        let wordHighlightTimer = null;
+        let captionStartTime = 0;
+        let captionDuration = 0;
 
-<div class="status-bar" id="statusBar"><div class="spinner"></div><span id="statusText">Searching YouTube…</span></div>
-<div class="error-bar" id="errorBar"><span>⚠</span> <span id="errorText">Something went wrong.</span></div>
+        // ── YouTube API ─────────────────────────────────────────
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('playerContainer', {
+                height: '100%',
+                width: '100%',
+                videoId: '',
+                playerVars: {
+                    autoplay: 1,
+                    rel: 0,
+                    cc_load_policy: 1,
+                    cc_lang_pref: 'en'
+                },
+                events: {
+                    onReady: () => { playerReady = true; },
+                    onStateChange: onStateChange,
+                    onError: onPlayerError
+                }
+            });
+        }
 
-<div class="results-section" id="resultsSection">
-<div class="results-header"><h2>Results</h2><span class="count" id="resultsCount"></span></div>
-<div class="video-list" id="videoList"></div>
-</div>
+        function onStateChange(e) {
+            isPlaying = e.data === YT.PlayerState.PLAYING;
+            if (isPlaying) {
+                startProgress();
+                startCaptionSync();
+                document.getElementById('playIcon').style.display = 'none';
+                document.getElementById('pauseIcon').style.display = 'block';
+            } else {
+                stopProgress();
+                stopCaptionSync();
+                document.getElementById('playIcon').style.display = 'block';
+                document.getElementById('pauseIcon').style.display = 'none';
+            }
+            if (e.data === YT.PlayerState.ENDED) nextVideo();
+        }
 
-<div class="player-section" id="playerSection">
-<div class="player-wrap">
-<div class="player-now-playing">
-<span class="now-badge">Now Playing</span>
-<span class="now-title" id="nowTitle">—</span>
-<span class="now-accent-badge US" id="accentBadge">US</span>
-</div>
-<div id="playerContainer"></div>
-<div class="progress-wrap">
-<div class="progress-bar-bg" id="progressBg" onclick="seekByClick(event)">
-<div class="progress-bar-fill" id="progressFill"></div>
-</div>
-</div>
-<div class="controls">
-<button class="ctrl-btn" onclick="prevVideo()" title="Previous video">
-<svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
-</button>
-<button class="ctrl-btn" onclick="seekRel(-5)" title="Back 5s">
-<svg viewBox="0 0 24 24"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6 8.5 6V6l-8.5 6z"/></svg><span>5s</span>
-</button>
-<button class="ctrl-btn primary" id="playPauseBtn" onclick="togglePlay()">
-<svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-<svg id="pauseIcon" viewBox="0 0 24 24" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-</button>
-<button class="ctrl-btn" onclick="seekRel(5)" title="Forward 5s">
-<svg viewBox="0 0 24 24"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg><span>5s</span>
-</button>
-<button class="ctrl-btn" onclick="nextVideo()" title="Next video">
-<svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
-</button>
-<div class="ctrl-spacer"></div>
-<span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)" id="timeDisplay">0:00</span>
-</div>
-</div>
-</div>
+        function onPlayerError(e) {
+            console.warn("Video error:", e.data);
+            showError("This video can't be played. Trying next...");
+            setTimeout(() => nextVideo(), 1200);
+        }
 
-<div class="subtitle-section" id="subtitleSection">
-<div class="subtitle-label">
-<span>Subtitles / Captions</span>
-<button class="translate-btn" id="translateBtn" onclick="translateCurrentText()">Translate</button>
-</div>
-<div class="subtitle-box" id="subtitleBox">
-<span class="sub-placeholder">Subtitles will appear here during playback…</span>
-<span class="subtitle-status" id="subStatus">waiting</span>
-</div>
-<div class="translation-box" id="translationBox">
-<div class="translation-label">Translation</div>
-<div class="translation-text" id="translationText"></div>
-</div>
-</div>
-</div>
-</div>
+        // ── Accent ─────────────────────────────────────────────
+        function setAccent(a) {
+            currentAccent = a;
+            document.querySelectorAll('.accent-btn').forEach(b => 
+                b.classList.toggle('active', b.dataset.accent === a)
+            );
+            document.getElementById('accentBadge').textContent = a;
+            document.getElementById('accentBadge').className = 'now-accent-badge ' + a;
+        }
 
-<footer class="footer">
-<div class="footer-content">
-<p>© 2026 Hamdy Youssef. All rights reserved.</p>
-<a href="mailto:hamdyyoussef962@gmail.com">hamdyyoussef962@gmail.com</a>
-</div>
-</footer>
+        // ── Search ─────────────────────────────────────────────
+        document.getElementById('searchInput').addEventListener('keydown', e => {
+            if (e.key === 'Enter') doSearch();
+        });
 
-<script src="https://www.youtube.com/iframe_api"></script>
-<script>
-let API_KEY = 'AIzaSyDGM1AMLvdPGn3fRw79pGMSRVuHfaHjEWc';
-let currentAccent = 'US';
-let videos = [], currentVideoIndex = 0;
-let player;
+        async function doSearch() {
+            const q = document.getElementById('searchInput').value.trim();
+            if (!q) return;
+            lastWord = q.toLowerCase();
+            hideError();
+            setStatus("Searching videos...");
+            document.getElementById('searchBtn').disabled = true;
+            document.getElementById('translationBox').classList.remove('visible');
+            
+            const accentLabel = currentAccent === 'US' 
+                ? 'American English pronunciation' 
+                : 'British English pronunciation';
+            
+            try {
+                // Search videos
+                const searchRes = await fetch(
+                    `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12&q=${encodeURIComponent(q + " " + accentLabel)}&key=${API_KEY}`
+                );
+                const searchData = await searchRes.json();
+                let rawVideos = (searchData.items || []).filter(v => v.id?.videoId);
+                
+                if (!rawVideos.length) {
+                    showError("No results found.");
+                    return;
+                }
+                
+                // Filter embeddable
+                const ids = rawVideos.map(v => v.id.videoId).join(',');
+                const videoRes = await fetch(
+                    `https://www.googleapis.com/youtube/v3/videos?part=status,contentDetails&id=${ids}&key=${API_KEY}`
+                );
+                const videoData = await videoRes.json();
+                const embeddableIds = new Set(
+                    videoData.items
+                        .filter(v => v.status.embeddable)
+                        .map(v => v.id)
+                );
+                
+                videos = rawVideos.filter(v => embeddableIds.has(v.id.videoId));
+                
+                if (!videos.length) {
+                    showError("No embeddable videos found. Try another word.");
+                    return;
+                }
+                
+                // Try to find video with captions containing the word and jump to timestamp
+                await findAndPlayWithTimestamp(q);
+                
+            } catch (err) {
+                console.error(err);
+                showError("Something went wrong.");
+            } finally {
+                hideStatus();
+                document.getElementById('searchBtn').disabled = false;
+            }
+        }
 
-function setAccent(accent){
-    currentAccent = accent;
-    document.querySelectorAll('.accent-btn').forEach(btn=>btn.classList.remove('active'));
-    document.querySelector('.accent-btn[data-accent="'+accent+'"]').classList.add('active');
-    document.getElementById('accentBadge').className = 'now-accent-badge ' + accent;
-    if(player && videos.length) loadVideo(currentVideoIndex);
-}
+        // Find caption and jump to timestamp
+        async function findAndPlayWithTimestamp(searchWord) {
+            for (let i = 0; i < videos.length; i++) {
+                const videoId = videos[i].id.videoId;
+                const captionsData = await fetchCaptions(videoId);
+                
+                if (captionsData && captionsData.length > 0) {
+                    // Find the word in captions
+                    const match = findWordInCaptions(captionsData, searchWord);
+                    
+                    if (match) {
+                        // Play video at specific time
+                        currentIndex = i;
+                        playVideoAtTime(videoId, match.startTime, videos[i].snippet);
+                        
+                        // Store captions for syncing
+                        captions = captionsData;
+                        return;
+                    }
+                }
+            }
+            
+            // If no timestamp found, just play first video
+            playVideo(0);
+        }
 
-function showStatus(msg){document.getElementById('statusText').textContent=msg; document.getElementById('statusBar').classList.add('visible');}
-function hideStatus(){document.getElementById('statusBar').classList.remove('visible');}
-function showError(msg){document.getElementById('errorText').textContent=msg; document.getElementById('errorBar').classList.add('visible');}
-function hideError(){document.getElementById('errorBar').classList.remove('visible');}
+        // Fetch captions from YouTube
+        async function fetchCaptions(videoId) {
+            try {
+                // Try to get captions using timedtext API
+                const response = await fetch(`https://video.google.com/timedtext?lang=en&v=${videoId}`);
+                if (!response.ok) return null;
+                
+                const xmlText = await response.text();
+                if (!xmlText || xmlText.includes(' transcript')) return null;
+                
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+                const textNodes = xmlDoc.querySelectorAll('text');
+                
+                const captionData = [];
+                textNodes.forEach(node => {
+                    const start = parseFloat(node.getAttribute('start'));
+                    const dur = parseFloat(node.getAttribute('dur')) || 2;
+                    const text = node.textContent;
+                    
+                    captionData.push({
+                        start: start,
+                        end: start + dur,
+                        duration: dur,
+                        text: text,
+                        words: text.split(/\s+/)
+                    });
+                });
+                
+                return captionData;
+            } catch (e) {
+                console.warn("Could not fetch captions:", e);
+                return null;
+            }
+        }
 
-function doSearch(){
-    let query = document.getElementById('searchInput').value.trim();
-    if(!query){showError('Please enter a word or phrase'); return;}
-    hideError(); showStatus('Searching YouTube...');
-    fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(query+' pronunciation '+currentAccent)}&key=${API_KEY}&maxResults=5`)
-    .then(res=>res.json()).then(data=>{
-        hideStatus(); if(!data.items.length){showError('No results found'); return;}
-        videos = data.items.map(item=>({videoId:item.id.videoId,title:item.snippet.title}));
-        currentVideoIndex=0; renderResults(); loadVideo(currentVideoIndex);
-    }).catch(err=>{hideStatus(); showError('Failed to fetch videos'); console.error(err);});
-}
+        // Find word in captions and return timestamp
+        function findWordInCaptions(captionsData, searchWord) {
+            const lowerSearch = searchWord.toLowerCase();
+            
+            for (let caption of captionsData) {
+                const lowerText = caption.text.toLowerCase();
+                
+                // Check if word is in this caption
+                if (lowerText.includes(lowerSearch)) {
+                    // Find exact word position
+                    const words = caption.text.split(/\s+/);
+                    for (let i = 0; i < words.length; i++) {
+                        const cleanWord = words[i].toLowerCase().replace(/[^\w]/g, '');
+                        if (cleanWord === lowerSearch || lowerText.includes(lowerSearch)) {
+                            // Calculate approximate word start time
+                            const wordOffset = (i / words.length) * caption.duration;
+                            return {
+                                startTime: Math.max(0, caption.start + wordOffset - 2), // Start 2 seconds before
+                                caption: caption
+                            };
+                        }
+                    }
+                    return {
+                        startTime: Math.max(0, caption.start - 2),
+                        caption: caption
+                    };
+                }
+            }
+            return null;
+        }
 
-function renderResults(){
-    document.getElementById('resultsSection').style.display='block';
-    document.getElementById('resultsCount').textContent=`(${videos.length} videos)`;
-    let list = document.getElementById('videoList'); list.innerHTML='';
-    videos.forEach((v,i)=>{
-        let div=document.createElement('div');
-        div.textContent=v.title; div.style.padding='6px 0'; div.style.cursor='pointer';
-        div.onclick=()=>{currentVideoIndex=i; loadVideo(i);}
-        list.appendChild(div);
-    });
-}
+        function playVideoAtTime(videoId, startTime, snippet) {
+            document.getElementById('playerSection').classList.add('visible');
+            document.getElementById('subtitleSection').classList.add('visible');
+            document.getElementById('nowTitle').textContent = snippet.title;
+            
+            if (playerReady) {
+                player.loadVideoById({
+                    videoId: videoId,
+                    startSeconds: startTime
+                });
+            }
+        }
 
-function loadVideo(index){
-    let vid = videos[index];
-    document.getElementById('playerSection').classList.add('visible');
-    document.getElementById('nowTitle').textContent=vid.title;
-    if(player){player.loadVideoById(vid.videoId);} else {
-        player = new YT.Player('playerContainer',{videoId:vid.videoId,events:{onReady:e=>e.target.playVideo(),onStateChange:onPlayerStateChange}});
-    }
-}
+        // ── Player ─────────────────────────────────────────────
+        function playVideo(index) {
+            if (!videos[index]) return;
+            currentIndex = index;
+            const vid = videos[index].id.videoId;
+            const snippet = videos[index].snippet;
+            
+            document.getElementById('playerSection').classList.add('visible');
+            document.getElementById('subtitleSection').classList.add('visible');
+            document.getElementById('nowTitle').textContent = snippet.title;
+            
+            // Fetch captions for this video
+            fetchCaptions(vid).then(caps => {
+                captions = caps || [];
+            });
+            
+            if (playerReady) {
+                player.loadVideoById(vid);
+            }
+        }
 
-function togglePlay(){
-    if(player.getPlayerState()===1){player.pauseVideo(); document.getElementById('playIcon').style.display='block'; document.getElementById('pauseIcon').style.display='none';}
-    else {player.playVideo(); document.getElementById('playIcon').style.display='none'; document.getElementById('pauseIcon').style.display='block';}
-}
-function prevVideo(){if(currentVideoIndex>0){currentVideoIndex--; loadVideo(currentVideoIndex);}}
-function nextVideo(){if(currentVideoIndex<videos.length-1){currentVideoIndex++; loadVideo(currentVideoIndex);}}
-function seekRel(sec){let t=player.getCurrentTime()+sec; player.seekTo(t,true);}
-function seekByClick(e){
-    let bg = document.getElementById('progressBg');
-    let rect = bg.getBoundingClientRect();
-    let pct = (e.clientX - rect.left)/rect.width;
-    let dur = player.getDuration();
-    player.seekTo(pct*dur,true);
-}
-function onPlayerStateChange(event){
-    if(event.data===YT.PlayerState.PLAYING){document.getElementById('playIcon').style.display='none';document.getElementById('pauseIcon').style.display='block';}
-    else{document.getElementById('playIcon').style.display='block';document.getElementById('pauseIcon').style.display='none';}
-    updateProgress();
-}
-function updateProgress(){
-    if(player && player.getDuration()){
-        let pct=(player.getCurrentTime()/player.getDuration())*100;
-        document.getElementById('progressFill').style.width=pct+'%';
-        let mins=Math.floor(player.getCurrentTime()/60); let secs=Math.floor(player.getCurrentTime()%60);
-        document.getElementById('timeDisplay').textContent=`${mins}:${secs.toString().padStart(2,'0')}`;
-        requestAnimationFrame(updateProgress);
-    }
-}
+        function nextVideo() {
+            if (currentIndex < videos.length - 1) {
+                playVideo(currentIndex + 1);
+            } else {
+                showError("No more playable videos.");
+            }
+        }
 
-function translateCurrentText(){
-    let text = document.getElementById('subtitleBox').textContent.trim();
-    if(!text || text==='Subtitles will appear here during playback…'){return;}
-    fetch('https://api.mymemory.translated.net/get?q='+encodeURIComponent(text)+'&langpair=en|ar')
-    .then(res=>res.json()).then(data=>{
-        let trans = data.responseData.translatedText;
-        document.getElementById('translationText').textContent=trans;
-        document.getElementById('translationBox').classList.add('visible');
-    });
-}
-</script>
+        function prevVideo() {
+            if (currentIndex > 0) {
+                playVideo(currentIndex - 1);
+            }
+        }
+
+        function togglePlay() {
+            if (!player) return;
+            const state = player.getPlayerState();
+            if (state === YT.PlayerState.PLAYING) {
+                player.pauseVideo();
+            } else {
+                player.playVideo();
+            }
+        }
+
+        function seekRel(sec) {
+            if (!player) return;
+            const cur = player.getCurrentTime();
+            player.seekTo(Math.max(0, cur + sec), true);
+        }
+
+        function seekByClick(e) {
+            if (!player) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const pct = (e.clientX - rect.left) / rect.width;
+            const dur = player.getDuration();
+            player.seekTo(dur * pct, true);
+        }
+
+        // ── Caption Sync with Word Highlighting ────────────────
+        function startCaptionSync() {
+            if (captionTimer) clearInterval(captionTimer);
+            captionTimer = setInterval(updateCaptionDisplay, 100);
+        }
+
+        function stopCaptionSync() {
+            clearInterval(captionTimer);
+            clearInterval(wordHighlightTimer);
+        }
+
+        function updateCaptionDisplay() {
+            if (!player || !captions.length) return;
+            
+            const currentTime = player.getCurrentTime();
+            const currentCaption = captions.find(cap => 
+                currentTime >= cap.start && currentTime <= cap.end
+            );
+            
+            if (currentCaption) {
+                if (currentCaptionText !== currentCaption.text) {
+                    currentCaptionText = currentCaption.text;
+                    captionStartTime = currentCaption.start;
+                    captionDuration = currentCaption.duration;
+                    
+                    // Split into words for highlighting
+                    captionWords = currentCaption.text.split(/\s+/);
+                    wordTimings = calculateWordTimings(captionWords, captionStartTime, captionDuration);
+                    
+                    displayCaptionWithHighlights(currentCaption.text, currentTime);
+                    startWordHighlighting();
+                }
+                
+                document.getElementById('subStatus').textContent = 'live';
+                document.getElementById('subStatus').classList.add('live');
+                document.getElementById('subtitleBox').classList.add('active');
+            } else {
+                document.getElementById('subStatus').textContent = 'waiting';
+                document.getElementById('subStatus').classList.remove('live');
+                document.getElementById('subtitleBox').classList.remove('active');
+            }
+        }
+
+        function calculateWordTimings(words, startTime, duration) {
+            const timings = [];
+            const avgWordDuration = duration / words.length;
+            
+            words.forEach((word, index) => {
+                timings.push({
+                    word: word,
+                    start: startTime + (index * avgWordDuration),
+                    end: startTime + ((index + 1) * avgWordDuration)
+                });
+            });
+            
+            return timings;
+        }
+
+        function startWordHighlighting() {
+            if (wordHighlightTimer) clearInterval(wordHighlightTimer);
+            
+            wordHighlightTimer = setInterval(() => {
+                if (!player) return;
+                const currentTime = player.getCurrentTime();
+                updateWordHighlight(currentTime);
+            }, 50);
+        }
+
+        function updateWordHighlight(currentTime) {
+            const words = document.querySelectorAll('.sub-word');
+            words.forEach((el, index) => {
+                if (wordTimings[index]) {
+                    const timing = wordTimings[index];
+                    const isActive = currentTime >= timing.start && currentTime <= timing.end;
+                    
+                    if (isActive) {
+                        el.classList.add('highlight');
+                        // Auto-scroll to word if needed
+                        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    } else {
+                        el.classList.remove('highlight');
+                    }
+                }
+            });
+        }
+
+        function displayCaptionWithHighlights(text, currentTime) {
+            const box = document.getElementById('subtitleBox');
+            const words = text.split(/\s+/);
+            
+            let html = '';
+            words.forEach((word, index) => {
+                const cleanWord = word.toLowerCase().replace(/[^\w]/g, '');
+                const isSearchWord = cleanWord === lastWord || word.toLowerCase().includes(lastWord);
+                const searchClass = isSearchWord ? 'search-word' : '';
+                
+                html += `<span class="sub-word ${searchClass}" data-index="${index}">${word}</span> `;
+            });
+            
+            box.innerHTML = html;
+            
+            // Immediately update highlight based on current time
+            updateWordHighlight(currentTime);
+        }
+
+        // ── Translation ────────────────────────────────────────
+        async function translateCurrentText() {
+            if (!currentCaptionText) return;
+            
+            const btn = document.getElementById('translateBtn');
+            btn.textContent = 'Translating...';
+            btn.disabled = true;
+            
+            try {
+                // Using MyMemory API (free, no key required)
+                const response = await fetch(
+                    `https://api.mymemory.translated.net/get?q=${encodeURIComponent(currentCaptionText)}&langpair=en|ar`
+                );
+                const data = await response.json();
+                
+                if (data.responseData) {
+                    document.getElementById('translationText').textContent = data.responseData.translatedText;
+                    document.getElementById('translationBox').classList.add('visible');
+                }
+            } catch (e) {
+                console.error("Translation error:", e);
+                // Fallback: show message
+                document.getElementById('translationText').textContent = "Translation service temporarily unavailable. Please try again later.";
+                document.getElementById('translationBox').classList.add('visible');
+            } finally {
+                btn.textContent = 'Translate';
+                btn.disabled = false;
+            }
+        }
+
+        // ── Progress ───────────────────────────────────────────
+        function startProgress() {
+            if (progressTimer) clearInterval(progressTimer);
+            progressTimer = setInterval(() => {
+                if (!player) return;
+                const cur = player.getCurrentTime();
+                const dur = player.getDuration();
+                if (dur > 0) {
+                    document.getElementById('progressFill').style.width = (cur / dur * 100) + '%';
+                    document.getElementById('timeDisplay').textContent = formatTime(cur);
+                }
+            }, 500);
+        }
+
+        function stopProgress() {
+            clearInterval(progressTimer);
+        }
+
+        function formatTime(sec) {
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            return m + ':' + (s < 10 ? '0' : '') + s;
+        }
+
+        // ── UI Helpers ─────────────────────────────────────────
+        function setStatus(msg) {
+            document.getElementById('statusText').textContent = msg;
+            document.getElementById('statusBar').classList.add('visible');
+        }
+
+        function hideStatus() {
+            document.getElementById('statusBar').classList.remove('visible');
+        }
+
+        function showError(msg) {
+            document.getElementById('errorText').textContent = msg;
+            document.getElementById('errorBar').classList.add('visible');
+        }
+
+        function hideError() {
+            document.getElementById('errorBar').classList.remove('visible');
+        }
+    </script>
 </body>
-</html>
+</html> 
