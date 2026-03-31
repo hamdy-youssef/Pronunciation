@@ -196,7 +196,9 @@
   
   .input-meta {
     display: flex; justify-content: space-between; align-items: center;
-    margin-top: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+    gap: 12px;
   }
   
   .lang-detect {
@@ -205,30 +207,42 @@
   }
   
   .accent-row {
-    display: flex; gap: 10px;
+    display: flex; gap: 12px;
   }
   
+  /* WIDER ACCENT BUTTONS */
   .accent-btn {
-    flex: 1; height: 44px;
+    min-width: 140px; /* Increased from flex:1 */
+    height: 48px; /* Increased from 44px */
     background: transparent;
-    border: 1.5px solid var(--border);
+    border: 2px solid var(--border); /* Thicker border */
     border-radius: var(--radius-sm);
     color: var(--muted);
     font-family: 'Syne', sans-serif;
-    font-size: 13px; font-weight: 700;
+    font-size: 14px; /* Slightly larger text */
+    font-weight: 700;
     cursor: pointer; transition: all 0.2s;
     display: flex; align-items: center; justify-content: center;
-    gap: 6px;
+    gap: 8px; /* More spacing */
+    padding: 0 24px; /* Horizontal padding */
   }
   
   .accent-btn.active[data-accent="US"] {
     border-color: var(--accent); color: var(--accent);
-    background: rgba(232,255,71,0.08);
+    background: rgba(232,255,71,0.12);
+    box-shadow: 0 0 20px rgba(232,255,71,0.15);
   }
   
   .accent-btn.active[data-accent="UK"] {
     border-color: var(--accent2); color: var(--accent2);
-    background: rgba(71,200,255,0.08);
+    background: rgba(71,200,255,0.12);
+    box-shadow: 0 0 20px rgba(71,200,255,0.15);
+  }
+  
+  .accent-btn:hover:not(.active) {
+    border-color: var(--surface3);
+    color: var(--text);
+    background: var(--surface2);
   }
   
   .search-btn {
@@ -239,6 +253,7 @@
     font-weight: 700; cursor: pointer;
     transition: all 0.2s;
     display: flex; align-items: center; gap: 8px;
+    justify-content: center;
   }
   
   .search-btn:hover:not(:disabled) {
@@ -248,6 +263,49 @@
   
   .search-btn:disabled {
     opacity: 0.5; cursor: not-allowed;
+  }
+
+  /* Alternative Source Banner */
+  .alt-source-banner {
+    display: none;
+    background: linear-gradient(135deg, rgba(71,200,255,0.1) 0%, rgba(232,255,71,0.1) 100%);
+    border: 1px solid var(--accent2);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    animation: fadeDown 0.4s ease both;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  
+  .alt-source-banner.visible {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  
+  .alt-source-info {
+    display: flex; align-items: center; gap: 12px;
+    flex: 1;
+  }
+  
+  .alt-source-btn {
+    background: var(--accent2);
+    color: var(--bg);
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  
+  .alt-source-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(71,200,255,0.3);
   }
 
   /* Progress & Status */
@@ -622,12 +680,6 @@
     0% { transform: translateX(-100%); }
     100% { transform: translateX(100%); }
   }
-  
-  @keyframes highlightPulse {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-  }
 
   /* Scrollbar */
   ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -638,11 +690,13 @@
   @media (max-width: 640px) {
     .wrapper { padding: 20px 16px 40px; }
     .search-grid { gap: 12px; }
-    .search-row { flex-direction: column; }
-    .search-btn { width: 100%; justify-content: center; }
+    .input-meta { flex-direction: column; align-items: flex-start; }
+    .accent-row { width: 100%; }
+    .accent-btn { flex: 1; min-width: auto; } /* Full width on mobile */
     .subtitle-box { padding: 20px; font-size: 17px; }
     .player-controls-custom { flex-wrap: wrap; }
     .ctrl-info { order: -1; width: 100%; margin-bottom: 8px; }
+    .alt-source-banner { flex-direction: column; text-align: center; }
   }
 </style>
 </head>
@@ -682,8 +736,14 @@
         <div class="input-meta">
           <span class="lang-detect" id="langDetect">Detecting language...</span>
           <div class="accent-row">
-            <button class="accent-btn active" data-accent="US" onclick="setAccent('US')">🇺🇸 US</button>
-            <button class="accent-btn" data-accent="UK" onclick="setAccent('UK')">🇬🇧 UK</button>
+            <button class="accent-btn active" data-accent="US" onclick="setAccent('US')">
+              <span>🇺🇸</span>
+              <span>American</span>
+            </button>
+            <button class="accent-btn" data-accent="UK" onclick="setAccent('UK')">
+              <span>🇬🇧</span>
+              <span>British</span>
+            </button>
           </div>
         </div>
       </div>
@@ -694,6 +754,18 @@
         Find in Videos
       </button>
     </div>
+  </div>
+
+  <!-- Alternative Source Banner -->
+  <div class="alt-source-banner" id="altSourceBanner">
+    <div class="alt-source-info">
+      <span style="font-size: 20px;">🔄</span>
+      <div>
+        <div style="font-weight: 600; color: var(--text); margin-bottom: 2px;">YouTube API Quota Exceeded</div>
+        <div style="font-size: 12px; color: var(--muted);">Switch to Invidious (free, unlimited) or use local demo videos</div>
+      </div>
+    </div>
+    <button class="alt-source-btn" onclick="useAlternativeSource()">Use Invidious</button>
   </div>
 
   <!-- Notifications -->
@@ -793,17 +865,24 @@
  * 
  * Architecture:
  * 1. Translation Layer (MyMemory API - Free)
- * 2. Content Search (YouTube Data API + Transcript scraping)
+ * 2. Content Search (YouTube Data API + Invidious Fallback + Transcript scraping)
  * 3. Local caching (localStorage)
  * 4. Karaoke renderer (word-level sync)
  */
 
 const CONFIG = {
-  YOUTUBE_API_KEY: 'AIzaSyDGM1AMLvdPGn3fRw79pGMSRVuHfaHjEWc', // Demo key - replace in production
-  MAX_RESULTS: 15,      // Videos to scan per search
-  TRANSCRIPT_CACHE_DURATION: 24 * 60 * 60 * 1000, // 24 hours
+  YOUTUBE_API_KEY: 'AIzaSyDGM1AMLvdPGn3fRw79pGMSRVuHfaHjEWc',
+  MAX_RESULTS: 15,
+  TRANSCRIPT_CACHE_DURATION: 24 * 60 * 60 * 1000,
   DEFAULT_LANG: 'en',
-  SUPPORTED_LANGS: ['en', 'ar', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ko']
+  INVIDIOUS_INSTANCES: [
+    'https://iv.datura.network',
+    'https://iv.nboeck.de',
+    'https://iv.melmac.space',
+    'https://iv.nboeck.de',
+    'https://yt.artemislena.eu'
+  ],
+  USE_ALTERNATIVE: false // Will be set to true when YouTube quota exceeded
 };
 
 // State
@@ -815,15 +894,16 @@ let state = {
   videos: [],
   currentVideoIndex: 0,
   currentMatchIndex: 0,
-  matches: [], // Array of {videoIndex, captionIndex, time, text}
+  matches: [],
   player: null,
   playerReady: false,
   isPlaying: false,
   captions: [],
   wordLevelCaptions: [],
-  subMode: 'karaoke', // 'karaoke' or 'static'
+  subMode: 'karaoke',
   searchStartTime: 0,
-  cache: new Map()
+  cache: new Map(),
+  quotaExceeded: false
 };
 
 // Translation Cache
@@ -857,7 +937,8 @@ const els = {
   statsGrid: document.getElementById('statsGrid'),
   statVideos: document.getElementById('statVideos'),
   statTime: document.getElementById('statTime'),
-  statAccuracy: document.getElementById('statAccuracy')
+  statAccuracy: document.getElementById('statAccuracy'),
+  altSourceBanner: document.getElementById('altSourceBanner')
 };
 
 // YouTube IFrame API
@@ -869,8 +950,8 @@ function onYouTubeIframeAPIReady() {
       autoplay: 1,
       rel: 0,
       modestbranding: 1,
-      cc_load_policy: 0, // We handle captions ourselves
-      controls: 0,       // Custom controls
+      cc_load_policy: 0,
+      controls: 0,
       disablekb: 1,
       fs: 0,
       iv_load_policy: 3
@@ -919,7 +1000,6 @@ els.searchInput.addEventListener('keypress', (e) => {
 });
 
 function detectLanguage(text) {
-  // Simple heuristic + API detection
   const arabic = /[\u0600-\u06FF]/.test(text);
   const cjk = /[\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff]/.test(text);
   const cyrillic = /[\u0400-\u04FF]/.test(text);
@@ -952,7 +1032,6 @@ async function translateText(text) {
   els.translationSection.classList.add('visible');
   
   try {
-    // MyMemory API (Free, 1000 words/day/IP)
     const pair = state.detectedLang === 'en' ? 'en|ar' : `${state.detectedLang}|en`;
     const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${pair}`;
     
@@ -979,44 +1058,71 @@ function showTranslation(data) {
   els.translationText.textContent = data.text;
   els.translationLang.textContent = data.lang.toUpperCase();
   
-  // If translated TO English, use that for search
   if (data.lang === 'en' && state.detectedLang !== 'en') {
     state.translatedQuery = data.text;
   }
 }
 
-// Core Search Algorithm
+// Alternative Source Handler
+function useAlternativeSource() {
+  CONFIG.USE_ALTERNATIVE = true;
+  state.quotaExceeded = true;
+  els.altSourceBanner.classList.remove('visible');
+  showInfo('Switched to Invidious (alternative source). Search again to use.');
+}
+
+// Core Search Algorithm with Fallbacks
 async function startContentSearch() {
   const rawQuery = els.searchInput.value.trim();
   if (!rawQuery) return;
   
-  // Use translated query if available, else original
   const searchQuery = state.translatedQuery || rawQuery;
   state.query = searchQuery.toLowerCase();
   state.searchStartTime = Date.now();
   state.matches = [];
   state.currentMatchIndex = 0;
   
-  // UI Reset
   hideError();
+  hideInfo();
   els.playerSection.classList.remove('visible');
   els.subtitleSection.classList.remove('visible');
   els.statsGrid.style.display = 'none';
   els.searchBtn.disabled = true;
   els.progressContainer.classList.add('visible');
-  updateProgress(0, CONFIG.MAX_RESULTS, 'Searching YouTube...');
+  els.altSourceBanner.classList.remove('visible');
+  updateProgress(0, CONFIG.MAX_RESULTS, 'Searching...');
   
   try {
-    // 1. Fetch video list
-    const videos = await fetchYouTubeVideos(searchQuery, state.accent);
+    let videos;
+    
+    if (CONFIG.USE_ALTERNATIVE || state.quotaExceeded) {
+      // Use Invidious API (free, unlimited)
+      videos = await fetchInvidiousVideos(searchQuery, state.accent);
+    } else {
+      try {
+        // Try YouTube API first
+        videos = await fetchYouTubeVideos(searchQuery, state.accent);
+      } catch (err) {
+        if (err.message.includes('quota') || err.message.includes('exceeded')) {
+          state.quotaExceeded = true;
+          els.altSourceBanner.classList.add('visible');
+          // Fallback to Invidious immediately
+          updateProgress(0, CONFIG.MAX_RESULTS, 'YouTube quota exceeded. Trying alternative...');
+          videos = await fetchInvidiousVideos(searchQuery, state.accent);
+        } else {
+          throw err;
+        }
+      }
+    }
+    
     state.videos = videos;
     
     if (!videos.length) {
-      throw new Error('No videos found for this term.');
+      throw new Error('No videos found. Try a different search term or check your connection.');
     }
     
-    // 2. Parallel transcript fetching with progress
-    updateProgress(0, videos.length, 'Downloading transcripts...');
+    // Scan transcripts
+    updateProgress(0, videos.length, 'Scanning transcripts...');
     
     const transcriptPromises = videos.map(async (video, idx) => {
       const result = await fetchTranscriptWithTimeout(video.id);
@@ -1026,7 +1132,7 @@ async function startContentSearch() {
     
     const results = await Promise.all(transcriptPromises);
     
-    // 3. Search transcripts for query
+    // Search transcripts
     results.forEach(({ video, idx, transcript }) => {
       if (!transcript || !transcript.length) return;
       
@@ -1045,10 +1151,10 @@ async function startContentSearch() {
     });
     
     if (!state.matches.length) {
-      throw new Error(`Found ${videos.length} videos, but none contain the word "${rawQuery}" in their transcripts. Try a different word.`);
+      throw new Error(`Found ${videos.length} videos, but none contain "${rawQuery}" in their transcripts. Try synonyms or check spelling.`);
     }
     
-    // 4. Sort by relevance (prefer shorter videos for quick pronunciation)
+    // Sort by relevance
     state.matches.sort((a, b) => {
       const aRelevance = a.text.toLowerCase().split(state.query).length - 1;
       const bRelevance = b.text.toLowerCase().split(state.query).length - 1;
@@ -1062,7 +1168,6 @@ async function startContentSearch() {
     els.statAccuracy.textContent = Math.min(95, Math.floor((state.matches.length / videos.length) * 100)) + '%';
     els.statsGrid.style.display = 'grid';
     
-    // 5. Play first match
     els.progressContainer.classList.remove('visible');
     playMatch(0);
     
@@ -1070,9 +1175,15 @@ async function startContentSearch() {
     showError(err.message);
     els.progressContainer.classList.remove('visible');
     els.searchBtn.disabled = false;
+    
+    if (err.message.includes('quota')) {
+      state.quotaExceeded = true;
+      els.altSourceBanner.classList.add('visible');
+    }
   }
 }
 
+// YouTube API Fetch
 async function fetchYouTubeVideos(query, accent) {
   const accentTerms = {
     'US': ['interview', 'podcast', 'news', 'american pronunciation'],
@@ -1085,7 +1196,12 @@ async function fetchYouTubeVideos(query, accent) {
   const r = await fetch(url);
   const data = await r.json();
   
-  if (data.error) throw new Error(`YouTube API: ${data.error.message}`);
+  if (data.error) {
+    if (data.error.errors && data.error.errors[0].reason === 'quotaExceeded') {
+      throw new Error('YouTube API quota exceeded');
+    }
+    throw new Error(`YouTube API: ${data.error.message}`);
+  }
   
   return (data.items || []).map(item => ({
     id: item.id.videoId,
@@ -1093,6 +1209,43 @@ async function fetchYouTubeVideos(query, accent) {
     channel: item.snippet.channelTitle,
     thumbnail: item.snippet.thumbnails?.medium?.url
   }));
+}
+
+// Invidious API Fetch (Free Alternative)
+async function fetchInvidiousVideos(query, accent) {
+  const accentTerms = {
+    'US': ['interview', 'podcast', 'news'],
+    'UK': ['bbc', 'british', 'interview']
+  };
+  
+  const enhancedQuery = `${query} ${accentTerms[accent].join(' ')}`;
+  
+  // Try multiple instances
+  for (const instance of CONFIG.INVIDIOUS_INSTANCES) {
+    try {
+      const url = `${instance}/api/v1/search?q=${encodeURIComponent(enhancedQuery)}&type=video&region=${accent === 'US' ? 'US' : 'GB'}`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      
+      const r = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
+      
+      if (!r.ok) continue;
+      
+      const data = await r.json();
+      
+      return data.slice(0, CONFIG.MAX_RESULTS).map(item => ({
+        id: item.videoId,
+        title: item.title,
+        channel: item.author,
+        thumbnail: item.videoThumbnails?.[0]?.url || `https://i.ytimg.com/vi/${item.videoId}/mqdefault.jpg`
+      }));
+    } catch (e) {
+      continue;
+    }
+  }
+  
+  throw new Error('All alternative sources failed. Please try again later.');
 }
 
 async function fetchTranscriptWithTimeout(videoId, timeout = 8000) {
@@ -1113,7 +1266,6 @@ async function fetchTranscriptWithTimeout(videoId, timeout = 8000) {
     const transcript = await fetchTranscript(videoId, controller.signal);
     clearTimeout(timer);
     
-    // Cache result
     localStorage.setItem(cacheKey, JSON.stringify({
       data: transcript,
       timestamp: Date.now()
@@ -1126,7 +1278,7 @@ async function fetchTranscriptWithTimeout(videoId, timeout = 8000) {
 }
 
 async function fetchTranscript(videoId, signal) {
-  // Try multiple caption sources
+  // Try YouTube's timedtext endpoints
   const urls = [
     `https://www.youtube.com/api/timedtext?lang=en&v=${videoId}&fmt=json3`,
     `https://www.youtube.com/api/timedtext?lang=en-US&v=${videoId}&fmt=json3`,
@@ -1149,7 +1301,7 @@ async function fetchTranscript(videoId, signal) {
     }
   }
   
-  // Fallback to XML format
+  // Fallback to XML
   try {
     const r = await fetch(`https://www.youtube.com/api/timedtext?lang=en&v=${videoId}&fmt=srv3`, { signal });
     if (r.ok) {
@@ -1193,7 +1345,6 @@ function playMatch(matchIndex) {
   state.currentVideoIndex = match.videoIndex;
   const video = match.video;
   
-  // Update UI
   els.playerSection.classList.add('visible');
   els.subtitleSection.classList.add('visible');
   els.searchBtn.disabled = false;
@@ -1201,15 +1352,13 @@ function playMatch(matchIndex) {
   els.videoMeta.textContent = `Match ${matchIndex + 1} of ${state.matches.length} • ${video.channel}`;
   els.timestampBadge.textContent = formatTime(match.time);
   
-  // Load video
   if (state.playerReady) {
     state.player.loadVideoById({
       videoId: video.id,
-      startSeconds: Math.max(0, match.time - 0.5) // Start slightly before
+      startSeconds: Math.max(0, match.time - 0.5)
     });
   }
   
-  // Load captions for this specific video
   loadVideoCaptions(video.id);
 }
 
@@ -1220,14 +1369,14 @@ async function loadVideoCaptions(videoId) {
   const transcript = await fetchTranscriptWithTimeout(videoId);
   
   if (!transcript) {
-    setSubStatus('error', 'No captions available');
+    setSubStatus('error', 'No captions');
     els.subtitleBox.innerHTML = '<div class="subtitle-placeholder">Transcript unavailable for this video</div>';
     return;
   }
   
   state.captions = transcript;
   
-  // Build word-level timing for karaoke
+  // Build word-level timing
   state.wordLevelCaptions = [];
   transcript.forEach(cap => {
     const words = cap.text.split(/\s+/);
@@ -1250,7 +1399,6 @@ async function loadVideoCaptions(videoId) {
 
 function renderSubtitles() {
   if (state.subMode === 'karaoke') {
-    // Render all words with spans for highlighting
     const html = state.wordLevelCaptions.map((word, idx) => {
       const classes = ['word'];
       if (word.searched) classes.push('searched');
@@ -1260,7 +1408,6 @@ function renderSubtitles() {
     
     els.subtitleBox.innerHTML = `<div class="subtitle-text">${html}</div>`;
   } else {
-    // Static mode: show current caption only
     els.subtitleBox.innerHTML = '<div class="subtitle-text" id="staticSub"></div>';
   }
 }
@@ -1270,7 +1417,7 @@ let captionInterval = null;
 
 function startCaptionSync() {
   stopCaptionSync();
-  captionInterval = setInterval(syncCaptions, 100); // 100ms for smooth karaoke
+  captionInterval = setInterval(syncCaptions, 100);
 }
 
 function stopCaptionSync() {
@@ -1285,7 +1432,6 @@ function syncCaptions() {
     els.timestampBadge.textContent = formatTime(time);
     
     if (state.subMode === 'karaoke' && state.wordLevelCaptions.length) {
-      // Find current word
       let currentIdx = -1;
       for (let i = 0; i < state.wordLevelCaptions.length; i++) {
         if (time >= state.wordLevelCaptions[i].start && time <= state.wordLevelCaptions[i].end) {
@@ -1295,7 +1441,6 @@ function syncCaptions() {
       }
       
       if (currentIdx !== -1) {
-        // Update classes
         const words = els.subtitleBox.querySelectorAll('.word');
         words.forEach((el, idx) => {
           el.classList.remove('active', 'past', 'future');
@@ -1304,18 +1449,15 @@ function syncCaptions() {
           else el.classList.add('future');
         });
         
-        // Auto-scroll to active word if needed
         const active = words[currentIdx];
         if (active && active.scrollIntoView) {
           active.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
         }
       }
     } else if (state.subMode === 'static') {
-      // Find current caption
       const cap = state.captions.find(c => time >= c.start && time <= c.start + c.dur);
       const container = document.getElementById('staticSub');
       if (container && cap) {
-        // Highlight searched term with red underline
         const regex = new RegExp(`(${escapeRegex(state.query)})`, 'gi');
         const highlighted = escapeHtml(cap.text).replace(regex, '<span class="word searched" style="border-bottom: 3px solid var(--accent3); color: var(--accent3);">$1</span>');
         container.innerHTML = highlighted;
@@ -1344,7 +1486,6 @@ function nextContext() {
 }
 
 function skipVideo() {
-  // Jump to next match that's in a different video
   const currentVideo = state.matches[state.currentMatchIndex].videoIndex;
   for (let i = state.currentMatchIndex + 1; i < state.matches.length; i++) {
     if (state.matches[i].videoIndex !== currentVideo) {
@@ -1352,7 +1493,6 @@ function skipVideo() {
       return;
     }
   }
-  // Loop back
   for (let i = 0; i < state.currentMatchIndex; i++) {
     if (state.matches[i].videoIndex !== currentVideo) {
       playMatch(i);
@@ -1398,11 +1538,21 @@ function formatTime(s) {
 function showError(msg) {
   els.errorText.textContent = msg;
   els.errorBar.classList.add('visible');
-  setTimeout(() => els.errorBar.classList.remove('visible'), 8000);
+  setTimeout(() => els.errorBar.classList.remove('visible'), 10000);
 }
 
 function hideError() {
   els.errorBar.classList.remove('visible');
+}
+
+function showInfo(msg) {
+  els.infoText.textContent = msg;
+  els.infoBar.classList.add('visible');
+  setTimeout(() => els.infoBar.classList.remove('visible'), 5000);
+}
+
+function hideInfo() {
+  els.infoBar.classList.remove('visible');
 }
 
 function escapeHtml(text) {
